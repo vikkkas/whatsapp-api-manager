@@ -1,0 +1,368 @@
+// This is your Prisma schema file
+// Learn more: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================
+// TENANT & AUTHENTICATION
+// ============================================
+
+model Tenant {
+  id        String   @id @default(cuid())
+  name      String
+  slug      String   @unique // Used in subdomains or URLs
+  status    TenantStatus @default(ACTIVE)
+  
+  // Billing & limits
+  plan      String   @default("free") // free, starter, pro, enterprise
+  messagesPerMinute Int @default(60)
+  maxPhoneNumbers   Int @default(1)
+  maxAgents        Int @default(3)
+  
+  // Usage tracking
+  messagesSentThisMonth Int @default(0)
+  billingPeriodStart    DateTime @default(now())
+  billingPeriodEnd      DateTime?
+  
+  // Customization
+  themeColor    String?  @default("#6366f1") // Primary brand color
+  themeName     String?  @default("default")
+  logoUrl       String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  // Relations
+  adminUsers    AdminUser[]
+  wabaCredentials WABACredential[]
+  conversations Conversation[]
+  messages      Message[]
+  templates     Template[]
+  rawWebhookEvents RawWebhookEvent[]
+  agents        Agent[]
+  
+  @@index([slug])
+  @@index([status])
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  TRIAL
+  CANCELLED
+}
+
+model AdminUser {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  password  String   // bcrypt hashed
+  name      String
+  role      UserRole @default(TENANT_ADMIN)
+  
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  lastLoginAt DateTime?
+  isActive    Boolean  @default(true)
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([email])
+}
+
+enum UserRole {
+  SYSTEM_ADMIN  // Platform super admin
+  TENANT_ADMIN  // Tenant owner/admin
+  AGENT         // Customer service agent
+  BILLING_ADMIN // Billing & subscription manager
+}
+
+model Agent {
+  id       String @id @default(cuid())
+  name     String
+  email    String
+  isOnline Boolean @default(false)
+  
+  tenantId String
+  tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  adminUserId String? // Link to AdminUser if agent has login
+  
+  assignedConversations Conversation[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@unique([tenantId, email])
+}
+
+// ============================================
+// WHATSAPP BUSINESS API CREDENTIALS
+// ============================================
+
+model WABACredential {
+  id              String  @id @default(cuid())
+  tenantId        String
+  tenant          Tenant  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  phoneNumberId   String  @unique // Meta's phone number ID
+  phoneNumber     String  // Actual WhatsApp number (e.g., +1234567890)
+  displayName     String? // Business display name
+  
+  // Encrypted access token (use KMS or app-level encryption)
+  accessToken     String  // Store encrypted in production
+  
+  businessAccountId String? // WABA ID
+  
+  isValid         Boolean @default(true)
+  lastValidatedAt DateTime @default(now())
+  invalidReason   String? // Token expired, revoked, etc.
+  
+  // Quality & limits
+  qualityRating   String? // GREEN, YELLOW, RED
+  messagingLimit  String? // TIER_1K, TIER_10K, etc.
+  
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([phoneNumberId])
+}
+
+// ============================================
+// RAW WEBHOOK EVENTS (Persist-First Pattern)
+// ============================================
+
+model RawWebhookEvent {
+  id        String   @id @default(cuid())
+  
+  // Resolved from phoneNumberId in payload
+  tenantId  String?
+  tenant    Tenant?  @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  
+  phoneNumberId String? // From Meta webhook payload
+  
+  // Raw payload as JSON
+  payload   Json
+  
+  // Processing status
+  status    WebhookStatus @default(PENDING)
+  processedAt DateTime?
+  errorMessage String?
+  retryCount   Int @default(0)
+  
+  createdAt DateTime @default(now())
+  
+  @@index([tenantId])
+  @@index([phoneNumberId])
+  @@index([status])
+  @@index([createdAt])
+}
+
+enum WebhookStatus {
+  PENDING
+  PROCESSING
+  PROCESSED
+  FAILED
+}
+
+// ============================================
+// CONVERSATIONS & MESSAGES
+// ============================================
+
+model Conversation {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  // Contact info
+  contactPhone  String   // Customer's WhatsApp number
+  contactName   String?
+  
+  // Assignment
+  assignedAgentId String?
+  assignedAgent   Agent? @relation(fields: [assignedAgentId], references: [id], onDelete: SetNull)
+  
+  // Status
+  status        ConversationStatus @default(OPEN)
+  unreadCount   Int      @default(0)
+  
+  // Metadata
+  lastMessageAt DateTime @default(now())
+  tags          String[] // For filtering/categorization
+  notes         String?  // Agent notes
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  messages      Message[]
+  
+  @@unique([tenantId, contactPhone])
+  @@index([tenantId])
+  @@index([status])
+  @@index([assignedAgentId])
+  @@index([lastMessageAt])
+}
+
+enum ConversationStatus {
+  OPEN
+  PENDING
+  RESOLVED
+  ARCHIVED
+}
+
+model Message {
+  id            String   @id @default(cuid())
+  tenantId      String
+  tenant        Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  
+  // WhatsApp identifiers (for idempotency)
+  waMessageId   String?  @unique // Meta's message ID
+  clientMessageId String? // Our outbound message ID
+  
+  // Message details
+  direction     MessageDirection
+  status        MessageStatus @default(PENDING)
+  
+  from          String   // Phone number
+  to            String   // Phone number
+  
+  // Content
+  type          MessageType @default(TEXT)
+  text          String?
+  
+  // Media
+  mediaType     String?  // image, video, audio, document
+  mediaId       String?  // Meta media ID
+  mediaMimeType String?
+  mediaUrl      String?  // Downloaded/stored URL
+  mediaFilename String?
+  mediaCaption  String?
+  
+  // Template messages
+  templateName  String?
+  templateParams Json?   // Array of parameter values
+  
+  // Timestamps
+  timestamp     DateTime @default(now())
+  deliveredAt   DateTime?
+  readAt        DateTime?
+  failedAt      DateTime?
+  errorMessage  String?
+  
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([conversationId])
+  @@index([waMessageId])
+  @@index([clientMessageId])
+  @@index([status])
+  @@index([timestamp])
+}
+
+enum MessageDirection {
+  INBOUND
+  OUTBOUND
+}
+
+enum MessageStatus {
+  PENDING   // Queued to send
+  SENT      // Sent to Meta API
+  DELIVERED // Meta confirmed delivery
+  READ      // User read it
+  FAILED    // Send/delivery failed
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  DOCUMENT
+  TEMPLATE
+  INTERACTIVE
+  LOCATION
+  CONTACT
+}
+
+// ============================================
+// MESSAGE TEMPLATES
+// ============================================
+
+model Template {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  // Template details from Meta
+  name      String   // Template name in Meta
+  language  String   // e.g., en_US
+  category  String   // MARKETING, UTILITY, AUTHENTICATION
+  
+  status    TemplateStatus @default(PENDING)
+  
+  // Template content
+  headerType    String?  // TEXT, IMAGE, VIDEO, DOCUMENT
+  headerText    String?
+  headerMediaUrl String?
+  
+  bodyText      String   // Template body with {{1}} placeholders
+  footerText    String?
+  
+  buttons       Json?    // Array of button configs
+  
+  // Metadata
+  metaTemplateId String? // Meta's template ID
+  rejectionReason String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@unique([tenantId, name, language])
+  @@index([tenantId])
+  @@index([status])
+}
+
+enum TemplateStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  DISABLED
+}
+
+// ============================================
+// USAGE & ANALYTICS (for billing & dashboards)
+// ============================================
+
+model DailyUsage {
+  id        String   @id @default(cuid())
+  tenantId  String
+  date      DateTime @db.Date
+  
+  messagesSent      Int @default(0)
+  messagesReceived  Int @default(0)
+  messagesDelivered Int @default(0)
+  messagesFailed    Int @default(0)
+  
+  conversationsStarted Int @default(0)
+  conversationsResolved Int @default(0)
+  
+  createdAt DateTime @default(now())
+  
+  @@unique([tenantId, date])
+  @@index([tenantId, date])
+}
