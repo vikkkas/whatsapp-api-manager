@@ -4,10 +4,9 @@ import prisma from '../config/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { enforceTenantIsolation } from '../middleware/tenant.js';
 import { log } from '../utils/logger.js';
-import axios from 'axios';
-import { decrypt } from '../utils/encryption.js';
 import { getTenantRateLimiter } from '../utils/rateLimiter.js';
 import { broadcastNewMessage } from '../services/websocket.js';
+import { getMetaAPIForTenant } from '../services/metaAPI.js';
 
 const router = express.Router();
 
@@ -66,8 +65,8 @@ router.get('/', async (req: Request, res: Response) => {
           conversation: {
             select: {
               id: true,
-              customerPhone: true,
-              customerName: true,
+              contactPhone: true,
+              contactName: true,
             },
           },
         },
@@ -166,8 +165,7 @@ router.post('/', async (req: Request, res: Response) => {
     let conversation = await prisma.conversation.findFirst({
       where: {
         tenantId,
-        phoneNumberId: data.phoneNumberId,
-        customerPhone: data.to,
+        contactPhone: data.to,
       },
     });
 
@@ -175,61 +173,37 @@ router.post('/', async (req: Request, res: Response) => {
       conversation = await prisma.conversation.create({
         data: {
           tenantId,
-          phoneNumberId: data.phoneNumberId,
-          customerPhone: data.to,
-          customerName: data.to,
+          contactPhone: data.to,
+          contactName: data.to,
           status: 'OPEN',
         },
       });
     }
 
-    // Build WhatsApp message payload
-    const messagePayload: any = {
-      messaging_product: 'whatsapp',
-      to: data.to,
-      type: data.type,
-    };
+    // Use Meta API service to send message
+    const metaAPI = await getMetaAPIForTenant(tenantId);
+    let waMessageId: string;
 
-    if (data.type === 'text' && data.text) {
-      messagePayload.text = { body: data.text };
-    } else if (data.type === 'image' && data.mediaUrl) {
-      messagePayload.image = {
-        link: data.mediaUrl,
-        caption: data.caption,
-      };
-    } else if (data.type === 'video' && data.mediaUrl) {
-      messagePayload.video = {
-        link: data.mediaUrl,
-        caption: data.caption,
-      };
-    } else if (data.type === 'audio' && data.mediaUrl) {
-      messagePayload.audio = {
-        link: data.mediaUrl,
-      };
-    } else if (data.type === 'document' && data.mediaUrl) {
-      messagePayload.document = {
-        link: data.mediaUrl,
-        filename: data.filename,
-        caption: data.caption,
-      };
-    }
-
-    // Decrypt access token
-    const accessToken = decrypt(credential.encryptedAccessToken);
-
-    // Send to WhatsApp API
-    const whatsappResponse = await axios.post(
-      `https://graph.facebook.com/v17.0/${data.phoneNumberId}/messages`,
-      messagePayload,
-      {
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Content-Type': 'application/json',
-        },
+    try {
+      if (data.type === 'text' && data.text) {
+        const result = await metaAPI.sendTextMessage(data.to, data.text, { preview_url: true });
+        waMessageId = result.messageId;
+      } else if (data.mediaUrl) {
+        // For media messages, you'd typically upload the media first to get a mediaId
+        // For now, we'll use the URL directly (requires link parameter in sendMediaMessage)
+        // In production, implement media upload flow
+        throw new Error('Media upload not yet implemented. Please use mediaId instead of URL.');
+      } else {
+        throw new Error('Invalid message type or missing content');
       }
-    );
-
-    const waMessageId = whatsappResponse.data.messages[0].id;
+    } catch (apiError: any) {
+      log.error('WhatsApp API error', {
+        error: apiError.message,
+        tenantId,
+        to: data.to,
+      });
+      throw new Error(`Failed to send message via WhatsApp: ${apiError.message}`);
+    }
 
     // Save message to database
     const message = await prisma.message.create({
@@ -237,15 +211,14 @@ router.post('/', async (req: Request, res: Response) => {
         tenantId,
         conversationId: conversation.id,
         waMessageId,
-        phoneNumberId: data.phoneNumberId,
         direction: 'OUTBOUND',
-        from: data.phoneNumberId,
+        from: credential.phoneNumber,
         to: data.to,
-        type: data.type,
+        type: data.type.toUpperCase() as any,
         text: data.text,
         mediaUrl: data.mediaUrl,
-        caption: data.caption,
-        filename: data.filename,
+        mediaCaption: data.caption,
+        mediaFilename: data.filename,
         status: 'SENT',
       },
     });
@@ -255,7 +228,6 @@ router.post('/', async (req: Request, res: Response) => {
       where: { id: conversation.id },
       data: {
         lastMessageAt: new Date(),
-        lastMessagePreview: data.text || `[${data.type}]`,
       },
     });
 

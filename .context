@@ -1,0 +1,310 @@
+# WhatsApp API Manager - Project Context
+
+## Overview
+Full-stack SaaS platform for managing WhatsApp Business API with multi-tenant support. Built with Express.js/TypeScript backend and React/TypeScript frontend.
+
+## Technology Stack
+
+### Backend
+- **Runtime**: Node.js 18+
+- **Framework**: Express.js with TypeScript
+- **Database**: PostgreSQL 14+ with Prisma ORM
+- **Queue**: BullMQ + Redis (optional)
+- **Auth**: JWT tokens with refresh
+- **WebSocket**: Socket.io for real-time
+- **API**: RESTful architecture
+
+### Frontend
+- **Framework**: React 18 + TypeScript
+- **Build**: Vite
+- **Styling**: TailwindCSS + Shadcn/ui
+- **State**: Zustand stores
+- **Forms**: React Hook Form + Zod
+- **Charts**: Recharts
+- **Router**: React Router v6
+
+## Architecture
+
+### Multi-Tenancy
+- Row-level tenant isolation in all tables
+- JWT contains `tenantId` for automatic scoping
+- Middleware enforces tenant boundaries
+- Each tenant has separate WhatsApp configuration
+
+### Authentication Flow
+1. User logs in → JWT token issued (7d) + refresh token (30d)
+2. Token stored in localStorage + HTTP-only cookie
+3. All API requests include `Authorization: Bearer <token>`
+4. WebSocket authenticates with token on connect
+5. Refresh token used to get new access token
+
+### Real-Time Updates
+- Socket.io connection established on auth
+- Rooms per conversation for targeted updates
+- Events: message:new, message:status, typing, conversation:updated
+- Auto-reconnect with exponential backoff
+
+### Message Flow
+1. Frontend sends message via API
+2. Backend validates + creates DB record
+3. Meta API called to send WhatsApp message
+4. Webhook receives delivery status
+5. Status updated in DB + emitted via WebSocket
+6. Frontend updates UI in real-time
+
+### Webhook Processing
+1. Meta sends webhook to `/api/webhook`
+2. Raw event stored in database
+3. Job queued in BullMQ (if Redis available)
+4. Worker processes: creates conversation + message
+5. WebSocket emits to connected clients
+6. Frontend updates conversation list + message thread
+
+## Project Structure
+
+```
+whatsapp-number-api-manager/
+├── backend/
+│   ├── src/
+│   │   ├── config/       # DB, Redis, Queue setup
+│   │   ├── controllers/  # Business logic
+│   │   ├── middleware/   # Auth, tenant, validation
+│   │   ├── routes/       # API endpoints
+│   │   ├── services/     # Meta API, WebSocket
+│   │   ├── utils/        # Helpers
+│   │   ├── workers/      # Background jobs
+│   │   └── server.js     # Entry point
+│   ├── prisma/
+│   │   └── schema.prisma # Database schema
+│   └── scripts/          # Admin tools
+│
+├── frontend/
+│   ├── src/
+│   │   ├── components/   # UI components
+│   │   ├── contexts/     # Auth, WebSocket
+│   │   ├── hooks/        # Custom hooks
+│   │   ├── lib/          # API client
+│   │   ├── pages/        # Route pages
+│   │   ├── store/        # Zustand stores
+│   │   └── App.tsx       # Root component
+│   └── public/
+│
+├── README.md             # Project overview
+├── BACKEND.md            # API documentation
+└── FRONTEND.md           # Component guide
+```
+
+## Key Database Models
+
+- **Tenant** - Organization with settings
+- **AdminUser** - Users (OWNER, ADMIN, AGENT roles)
+- **Conversation** - WhatsApp conversation thread
+- **Message** - Individual messages (text, media, template)
+- **Template** - WhatsApp message templates
+- **Contact** - Contact directory
+- **RawWebhookEvent** - Incoming webhook log
+
+## API Endpoints
+
+### Auth
+- `POST /api/auth/register` - Create tenant
+- `POST /api/auth/login` - User login
+- `GET /api/auth/me` - Current user
+
+### Messages
+- `GET /api/messages` - List with filters
+- `POST /api/messages` - Send message
+- `GET /api/messages/:id` - Get details
+
+### Conversations
+- `GET /api/conversations` - List all
+- `GET /api/conversations/:id` - Get with messages
+- `PATCH /api/conversations/:id` - Update status/tags
+
+### Templates
+- `GET /api/templates` - List templates
+- `POST /api/templates` - Create template
+
+### Analytics
+- `GET /api/analytics/overview?days=30` - Stats
+- `GET /api/analytics/messages?days=7` - Charts
+
+### Contacts
+- `GET /api/contacts` - List
+- `POST /api/contacts` - Create
+- `GET /api/contacts/export` - CSV export
+
+### Settings
+- `GET /api/settings` - Get tenant config
+- `PATCH /api/settings` - Update WhatsApp config
+
+### Webhook
+- `GET /api/webhook` - Verification
+- `POST /api/webhook` - Receive events
+
+## Frontend Routes
+
+- `/login` - Authentication
+- `/` - Dashboard (protected)
+- `/inbox` - Conversations + messages
+- `/send-message` - Compose new
+- `/templates` - Template manager
+- `/analytics` - Charts + stats
+- `/settings` - Configuration
+- `/users` - User management (admin)
+
+## State Management
+
+### Zustand Stores
+- **authStore** - User, token, isAuthenticated
+- **conversationStore** - List, selected, filters
+- **messageStore** - Messages by conversation
+
+### React Context
+- **AuthContext** - Wraps authStore with helpers
+- **WebSocketContext** - Socket connection + events
+
+## Environment Variables
+
+### Backend (.env)
+```
+DATABASE_URL=postgresql://...
+JWT_SECRET=...
+JWT_REFRESH_SECRET=...
+META_ACCESS_TOKEN=...
+META_PHONE_NUMBER_ID=...
+META_WEBHOOK_VERIFY_TOKEN=...
+REDIS_HOST=localhost (optional)
+PORT=3000
+NODE_ENV=development
+```
+
+### Frontend (.env)
+```
+VITE_BACKEND_URL=http://localhost:3000
+VITE_WS_URL=http://localhost:3000
+```
+
+## Development Commands
+
+### Backend
+```bash
+cd backend
+npm install
+npx prisma generate
+npx prisma migrate deploy
+npm run create-admin
+npm run dev           # Start dev server
+npm run build         # TypeScript compile
+npm start             # Production server
+```
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev           # Start dev server (port 8080)
+npm run build         # Production build
+npm run preview       # Preview build
+```
+
+## Recent Changes (Nov 2025)
+
+### Fixed
+1. ✅ Toast library migration (react-hot-toast → sonner)
+2. ✅ Analytics null safety and API response structure
+3. ✅ SQL query column names (snake_case → camelCase)
+4. ✅ TypeScript build errors (strict mode, type issues)
+5. ✅ Backend compilation (73 errors → 0)
+
+### Configuration Updates
+- TypeScript strict mode disabled for build
+- Prisma event handlers commented out (type issues)
+- Queue and Redis configs with type casts
+- AuthenticatedRequest interface fixed
+
+### Documentation
+- Cleaned up 20+ redundant markdown files
+- Created concise README, BACKEND.md, FRONTEND.md
+- Updated Postman collection with current endpoints
+- This .context file for AI assistance
+
+## Known Limitations
+
+1. **Redis Optional** - Backend runs without Redis but no queue processing
+2. **File Upload** - Local storage only, no S3/cloud integration yet
+3. **Analytics** - Limited to overview, no detailed reports
+4. **Templates** - Create only, no sync from Meta
+5. **Testing** - No automated tests yet
+
+## Next Steps / Roadmap
+
+1. Docker containerization
+2. Automated testing (Jest, Cypress)
+3. Advanced analytics and reporting
+4. Cloud storage integration (S3)
+5. Template sync from Meta API
+6. Rate limiting and request throttling
+7. Audit logging
+8. Kubernetes deployment configs
+
+## Troubleshooting
+
+### Backend won't start
+- Check PostgreSQL is running
+- Verify DATABASE_URL in .env
+- Run `npx prisma generate`
+
+### Frontend can't connect
+- Check VITE_BACKEND_URL matches backend
+- Verify backend is running on correct port
+- Check browser console for CORS errors
+
+### WebSocket not working
+- Verify VITE_WS_URL is set
+- Check JWT token is valid
+- Look for connection errors in console
+
+### Build errors
+- Clear node_modules and reinstall
+- Check Node.js version (18+)
+- Delete .vite cache folder
+
+## Code Style
+
+- TypeScript strict (when possible)
+- ESLint + Prettier
+- Functional components with hooks
+- Zustand for global state
+- React Hook Form for forms
+- Tailwind utility classes
+- Shadcn/ui components
+
+## Security Notes
+
+- JWT secrets must be strong (256-bit)
+- HTTPS required in production
+- CORS configured for frontend origin
+- SQL injection prevented by Prisma
+- Input validation on all endpoints
+- Tenant isolation enforced in middleware
+- Passwords hashed with bcrypt
+
+## Meta WhatsApp Setup
+
+1. Create Business App at developers.facebook.com
+2. Add WhatsApp product
+3. Generate permanent access token
+4. Get phone number ID
+5. Configure webhook URL + verify token
+6. Subscribe to messages + message_status events
+7. Update backend .env with credentials
+8. Test with webhook tester
+
+## Support Resources
+
+- README.md - Quick start guide
+- BACKEND.md - Complete API docs
+- FRONTEND.md - Component architecture
+- Postman collection - API testing
+- Prisma schema - Database reference

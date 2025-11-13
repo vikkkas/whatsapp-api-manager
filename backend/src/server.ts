@@ -25,6 +25,8 @@ import templateRoutes from './routes/templates.js';
 import settingsRoutes from './routes/settings.js';
 import analyticsRoutes from './routes/analytics.js';
 import healthRoutes from './routes/health.js';
+import mediaRoutes from './routes/media.js';
+import contactRoutes from './routes/contacts.js';
 
 const app: Express = express();
 const PORT = process.env.PORT || 3000;
@@ -98,6 +100,8 @@ app.use('/api/conversations', conversationRoutes);
 app.use('/api/templates', templateRoutes);
 app.use('/api/settings', settingsRoutes);
 app.use('/api/analytics', analyticsRoutes);
+app.use('/api/media', mediaRoutes);
+app.use('/api/contacts', contactRoutes);
 
 // ============================================
 // ROOT ENDPOINT
@@ -131,7 +135,7 @@ interface ApiError extends Error {
   isOperational?: boolean;
 }
 
-app.use((err: ApiError, req: Request, res: Response, next: NextFunction) => {
+app.use((err: ApiError, req: Request, res: Response, _next: NextFunction) => {
   log.error('Unhandled error', {
     error: err.message,
     stack: err.stack,

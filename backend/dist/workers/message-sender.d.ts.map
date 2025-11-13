@@ -1,0 +1,1 @@
+{"version":3,"file":"message-sender.d.ts","sourceRoot":"","sources":["../../src/workers/message-sender.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,MAAM,EAAO,MAAM,QAAQ,CAAC;AAWrC,UAAU,cAAc;IACtB,SAAS,EAAE,MAAM,CAAC;IAClB,QAAQ,EAAE,MAAM,CAAC;CAClB;AAMD,eAAO,MAAM,iBAAiB,qCAqH7B,CAAC;AA6FF,eAAe,iBAAiB,CAAC"}

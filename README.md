@@ -1,282 +1,561 @@
-# WhatsApp Business API Manager - Multi-Tenant SaaS
+# WhatsApp Number API Manager# WhatsApp Business API Manager - Multi-Tenant SaaS
 
-A production-ready, multi-tenant SaaS platform for managing WhatsApp Business API communications at scale. Built with TypeScript, PostgreSQL, Redis, and modern best practices.
 
-## 🚀 Features
 
-- **Multi-Tenant Architecture** - Complete tenant isolation with per-tenant rate limiting
-- **Persist-First Webhooks** - Reliable message processing with automatic retries
-- **Type-Safe** - Full TypeScript implementation with strict type checking
-- **Queue-Based Workers** - BullMQ for durable background job processing
-- **Rate Limiting** - Token bucket algorithm for per-tenant message throttling
-- **Encrypted Credentials** - Secure storage of WABA access tokens
-- **Real-time Updates** - WebSocket/SSE support for live UI updates
-- **Comprehensive API Docs** - OpenAPI/Swagger documentation
-- **Theme Customization** - Per-tenant branding and theming
+A full-stack SaaS platform for managing WhatsApp Business API conversations, messages, and templates with multi-tenant support.A production-ready, multi-tenant SaaS platform for managing WhatsApp Business API communications at scale. Built with TypeScript, PostgreSQL, Redis, and modern best practices.
+
+
+
+## 🚀 Features## 🚀 Features
+
+
+
+- **Multi-Tenant Architecture** - Complete tenant isolation with role-based access control- **Multi-Tenant Architecture** - Complete tenant isolation with per-tenant rate limiting
+
+- **WhatsApp Integration** - Send/receive messages, manage templates, handle webhooks- **Persist-First Webhooks** - Reliable message processing with automatic retries
+
+- **Real-Time Updates** - WebSocket support for live message updates- **Type-Safe** - Full TypeScript implementation with strict type checking
+
+- **Analytics Dashboard** - Track messages, conversations, and delivery rates- **Queue-Based Workers** - BullMQ for durable background job processing
+
+- **Template Management** - Create and manage WhatsApp message templates- **Rate Limiting** - Token bucket algorithm for per-tenant message throttling
+
+- **Contact Management** - Import/export contacts with CSV support- **Encrypted Credentials** - Secure storage of WABA access tokens
+
+- **Media Support** - Handle images, videos, documents, and audio files- **Real-time Updates** - WebSocket/SSE support for live UI updates
+
+- **Message Queue** - BullMQ with Redis for reliable message processing- **Comprehensive API Docs** - OpenAPI/Swagger documentation
+
+- **Modern UI** - Built with React, TypeScript, TailwindCSS, and Shadcn/ui- **Theme Customization** - Per-tenant branding and theming
+
 - **Analytics Dashboard** - Message metrics and conversation insights
 
 ## 📋 Prerequisites
 
-- **Node.js** >= 18.x
-- **PostgreSQL** >= 14.x
-- **Redis** >= 6.x
+## 📋 Prerequisites
+
+- Node.js 18+ and npm/yarn/bun
+
+- PostgreSQL 14+- **Node.js** >= 18.x
+
+- Redis 6+ (optional, can run without queue processing)- **PostgreSQL** >= 14.x
+
+- Meta WhatsApp Business Account- **Redis** >= 6.x
+
 - **npm** or **bun** or **yarn**
 
 ## 🛠️ Tech Stack
 
-### Backend
-- **Runtime**: Node.js with TypeScript
-- **Framework**: Express.js
-- **Database**: PostgreSQL with Prisma ORM
-- **Queue**: Redis + BullMQ
-- **Auth**: JWT with refresh tokens
-- **Validation**: Zod
-- **Logging**: Winston
-- **API Docs**: Swagger/OpenAPI
+## 🛠️ Tech Stack
 
-### Frontend
-- **Framework**: React + TypeScript
-- **Build Tool**: Vite
-- **UI Library**: Shadcn UI + Radix UI
+### Backend
+
+- **Framework:** Express.js + TypeScript### Backend
+
+- **Database:** PostgreSQL + Prisma ORM- **Runtime**: Node.js with TypeScript
+
+- **Queue:** BullMQ + Redis- **Framework**: Express.js
+
+- **Auth:** JWT tokens- **Database**: PostgreSQL with Prisma ORM
+
+- **WebSocket:** Socket.io- **Queue**: Redis + BullMQ
+
+- **API:** RESTful + Real-time events- **Auth**: JWT with refresh tokens
+
+- **Validation**: Zod
+
+### Frontend- **Logging**: Winston
+
+- **Framework:** React 18 + TypeScript + Vite- **API Docs**: Swagger/OpenAPI
+
+- **Styling:** TailwindCSS + Shadcn/ui
+
+- **State:** Zustand### Frontend
+
+- **Charts:** Recharts- **Framework**: React + TypeScript
+
+- **Forms:** React Hook Form + Zod- **Build Tool**: Vite
+
+- **Routing:** React Router v6- **UI Library**: Shadcn UI + Radix UI
+
 - **Styling**: TailwindCSS
-- **State**: TanStack Query
+
+## 🚀 Quick Start- **State**: TanStack Query
+
 - **Theme**: next-themes
 
-## 📦 Quick Installation
+### 1. Clone Repository
 
-### Option 1: Quick Start (Recommended for Testing)
+```bash## 📦 Quick Installation
+
+git clone <repository-url>
+
+cd whatsapp-number-api-manager### Option 1: Quick Start (Recommended for Testing)
+
+```
 
 Follow the [**Quick Start Guide**](./docs/QUICK_START.md) for a 10-minute setup with Docker.
 
-### Option 2: Manual Installation
+### 2. Backend Setup
 
-See the [Installation Guide](#-installation-guide) below for detailed steps.
+```bash### Option 2: Manual Installation
 
-### Prerequisites
+cd backend
 
-- Node.js 18+ and npm
+npm installSee the [Installation Guide](#-installation-guide) below for detailed steps.
+
+
+
+# Configure environment### Prerequisites
+
+cp .env.example .env
+
+# Edit .env with your credentials- Node.js 18+ and npm
+
 - PostgreSQL 14+
-- Redis 6+
 
-```bash
+# Setup database- Redis 6+
+
+npx prisma migrate deploy
+
+npx prisma generate```bash
+
 # Clone repository
-git clone https://github.com/vikkkas/whatsapp-number-api-manager.git
-cd whatsapp-number-api-manager
 
-# Start databases with Docker
-docker-compose up -d postgres redis
+# Create admin usergit clone https://github.com/vikkkas/whatsapp-number-api-manager.git
+
+npm run create-admincd whatsapp-number-api-manager
+
+
+
+# Start server# Start databases with Docker
+
+npm run devdocker-compose up -d postgres redis
+
+```
 
 # Setup backend
-cd backend
-npm install
-cp .env.example .env
-# Edit .env with your settings
+
+### 3. Frontend Setupcd backend
+
+```bashnpm install
+
+cd frontendcp .env.example .env
+
+npm install# Edit .env with your settings
+
 npm run db:generate
-npm run db:migrate
 
-# Setup frontend
+# Configure environmentnpm run db:migrate
+
+cp .env.example .env
+
+# Edit .env with backend URL# Setup frontend
+
 cd ../frontend
-npm install
 
-# Start everything (3 terminals)
+# Start development servernpm install
+
+npm run dev
+
+```# Start everything (3 terminals)
+
 # Terminal 1: cd backend && npm run dev
-# Terminal 2: cd backend && npm run worker:dev
-# Terminal 3: cd frontend && npm run dev
-```
+
+### 4. Access Application# Terminal 2: cd backend && npm run worker:dev
+
+- Frontend: http://localhost:8080# Terminal 3: cd frontend && npm run dev
+
+- Backend API: http://localhost:3000```
+
+- Default Admin: Check console after running `create-admin`
 
 **📚 Full Guide:** See [QUICK_START.md](./docs/QUICK_START.md)
 
+## 📁 Project Structure
+
 ## 🚀 Running the Application
 
-### Development Mode
+```
 
-\`\`\`bash
-# Terminal 1 - Backend API Server
-cd backend
-npm run dev
+whatsapp-number-api-manager/### Development Mode
 
-# Terminal 2 - Background Workers
-cd backend
-npm run worker:dev
+├── backend/              # Express.js API server
 
-# Terminal 3 - Frontend Dev Server
+│   ├── src/\`\`\`bash
+
+│   │   ├── config/      # Database, Redis, Queue configs# Terminal 1 - Backend API Server
+
+│   │   ├── controllers/ # Route controllerscd backend
+
+│   │   ├── middleware/  # Auth, tenant isolation, validationnpm run dev
+
+│   │   ├── models/      # Prisma models (generated)
+
+│   │   ├── routes/      # API endpoints# Terminal 2 - Background Workers
+
+│   │   ├── services/    # Business logic (Meta API, etc)cd backend
+
+│   │   ├── utils/       # Helpers and utilitiesnpm run worker:dev
+
+│   │   └── workers/     # Background job processors
+
+│   ├── prisma/          # Database schema and migrations# Terminal 3 - Frontend Dev Server
+
+│   └── uploads/         # Media file storagecd frontend
+
+│npm run dev
+
+├── frontend/            # React application\`\`\`
+
+│   ├── src/
+
+│   │   ├── components/  # Reusable UI components### Production Mode
+
+│   │   ├── contexts/    # React contexts (Auth, WebSocket)
+
+│   │   ├── hooks/       # Custom React hooks\`\`\`bash
+
+│   │   ├── lib/         # API client and utilities# Build backend
+
+│   │   ├── pages/       # Route pages/viewscd backend
+
+│   │   └── store/       # Zustand state managementnpm run build
+
+│   └── public/          # Static assetsnpm start
+
+│
+
+└── docs/                # Additional documentation# Build and start workers
+
+```npm run worker
+
+
+
+## 🔧 Environment Variables# Build frontend
+
 cd frontend
-npm run dev
-\`\`\`
 
-### Production Mode
+### Backend (.env)npm run build
 
-\`\`\`bash
-# Build backend
-cd backend
-npm run build
-npm start
+```envnpm run preview
 
-# Build and start workers
-npm run worker
+# Database\`\`\`
 
-# Build frontend
-cd frontend
-npm run build
-npm run preview
-\`\`\`
+DATABASE_URL="postgresql://user:password@localhost:5432/whatsapp_saas"
 
 ## 🔧 Environment Variables
 
-### Backend (.env)
+# JWT
 
-\`\`\`bash
-# Database
+JWT_SECRET="your-secret-key"### Backend (.env)
+
+JWT_REFRESH_SECRET="your-refresh-secret"
+
+JWT_EXPIRES_IN="7d"\`\`\`bash
+
+JWT_REFRESH_EXPIRES_IN="30d"# Database
+
 DATABASE_URL="postgresql://user:password@localhost:5432/whatsapp_saas"
 
-# Redis
-REDIS_URL="redis://localhost:6379"
+# Meta WhatsApp API
 
-# JWT Secrets (CHANGE IN PRODUCTION!)
-JWT_SECRET="your-super-secret-jwt-key-min-32-chars"
+META_ACCESS_TOKEN="your-meta-token"# Redis
+
+META_PHONE_NUMBER_ID="your-phone-number-id"REDIS_URL="redis://localhost:6379"
+
+META_BUSINESS_ACCOUNT_ID="your-business-account-id"
+
+META_WEBHOOK_VERIFY_TOKEN="your-verify-token"# JWT Secrets (CHANGE IN PRODUCTION!)
+
+META_API_VERSION="v18.0"JWT_SECRET="your-super-secret-jwt-key-min-32-chars"
+
 JWT_EXPIRES_IN="7d"
-JWT_REFRESH_SECRET="your-refresh-secret-min-32-chars"
-JWT_REFRESH_EXPIRES_IN="30d"
 
-# WhatsApp/Meta
+# Redis (optional)JWT_REFRESH_SECRET="your-refresh-secret-min-32-chars"
+
+REDIS_HOST="localhost"JWT_REFRESH_EXPIRES_IN="30d"
+
+REDIS_PORT="6379"
+
+REDIS_PASSWORD=""# WhatsApp/Meta
+
 WEBHOOK_VERIFY_TOKEN="your-webhook-verify-token"
-META_API_VERSION="v21.0"
-META_API_BASE_URL="https://graph.facebook.com"
 
-# Encryption (CHANGE IN PRODUCTION!)
-ENCRYPTION_KEY="your-32-character-encryption-key!!"
+# ServerMETA_API_VERSION="v21.0"
 
-# Server
-PORT=3000
+PORT="3000"META_API_BASE_URL="https://graph.facebook.com"
+
 NODE_ENV="development"
-FRONTEND_URL="http://localhost:5173"
 
-# Logging
-LOG_LEVEL="info"
-\`\`\`
+```# Encryption (CHANGE IN PRODUCTION!)
+
+ENCRYPTION_KEY="your-32-character-encryption-key!!"
 
 ### Frontend (.env)
 
-\`\`\`bash
-VITE_API_URL=http://localhost:3000
-VITE_WS_URL=ws://localhost:3000
-\`\`\`
+```env# Server
+
+VITE_BACKEND_URL="http://localhost:3000"PORT=3000
+
+VITE_WS_URL="http://localhost:3000"NODE_ENV="development"
+
+```FRONTEND_URL="http://localhost:5173"
+
+
+
+## 📚 API Documentation# Logging
+
+LOG_LEVEL="info"
+
+See [BACKEND.md](./BACKEND.md) for detailed API documentation.\`\`\`
+
+
+
+Key endpoints:### Frontend (.env)
+
+- `POST /api/auth/login` - User authentication
+
+- `GET /api/messages` - List messages\`\`\`bash
+
+- `POST /api/messages` - Send messageVITE_API_URL=http://localhost:3000
+
+- `GET /api/conversations` - List conversationsVITE_WS_URL=ws://localhost:3000
+
+- `GET /api/analytics/overview` - Analytics data\`\`\`
+
+- `POST /api/webhook` - Meta webhook endpoint
 
 ## 📚 Documentation
 
+## 🎨 Frontend Documentation
+
 - **[Quick Start Guide](./docs/QUICK_START.md)** - Get running in 10 minutes
-- **[API Documentation](./docs/API.md)** - Complete API reference
+
+See [FRONTEND.md](./FRONTEND.md) for component architecture and development guide.- **[API Documentation](./docs/API.md)** - Complete API reference
+
 - **[Architecture Overview](./docs/ARCHITECTURE.md)** - System design & data flow
-- **[Deployment Guide](./docs/DEPLOYMENT.md)** - Production deployment
+
+## 🚀 Deployment- **[Deployment Guide](./docs/DEPLOYMENT.md)** - Production deployment
+
 - **[Meta Setup Guide](./docs/META_SETUP.md)** - WhatsApp Business API setup
 
-### Interactive API Docs
+### Backend
 
-Once the backend is running, access Swagger UI at:
+```bash### Interactive API Docs
 
-**http://localhost:3000/api-docs**
+cd backend
 
-### Key Endpoints
+npm run buildOnce the backend is running, access Swagger UI at:
 
-#### Authentication
-- `POST /api/auth/register` - Register new tenant
-- `POST /api/auth/login` - Login
-- `POST /api/auth/refresh` - Refresh access token
+npm start
 
-#### WABA Management
-- `POST /api/waba/credentials` - Add WhatsApp Business Account
-- `GET /api/waba/credentials` - List WABA credentials
-- `DELETE /api/waba/credentials/:id` - Remove WABA
+```**http://localhost:3000/api-docs**
 
-#### Messages
+
+
+### Frontend### Key Endpoints
+
+```bash
+
+cd frontend#### Authentication
+
+npm run build- `POST /api/auth/register` - Register new tenant
+
+# Serve the dist/ folder with any static server- `POST /api/auth/login` - Login
+
+```- `POST /api/auth/refresh` - Refresh access token
+
+
+
+### Docker (Coming Soon)#### WABA Management
+
+```bash- `POST /api/waba/credentials` - Add WhatsApp Business Account
+
+docker-compose up -d- `GET /api/waba/credentials` - List WABA credentials
+
+```- `DELETE /api/waba/credentials/:id` - Remove WABA
+
+
+
+## 🔐 Security Features#### Messages
+
 - `POST /api/messages/send` - Send text message
-- `POST /api/messages/send-media` - Send media message
-- `POST /api/messages/send-template` - Send template message
-- `GET /api/messages` - List messages (paginated)
 
-#### Webhooks
-- `GET /api/webhook` - Webhook verification
-- `POST /api/webhook` - Receive Meta webhooks
+- JWT-based authentication with refresh tokens- `POST /api/messages/send-media` - Send media message
 
-#### Conversations
+- Row-level tenant isolation in database- `POST /api/messages/send-template` - Send template message
+
+- Request validation and sanitization- `GET /api/messages` - List messages (paginated)
+
+- CORS configuration
+
+- Environment-based secrets#### Webhooks
+
+- SQL injection prevention via Prisma- `GET /api/webhook` - Webhook verification
+
+- XSS protection- `POST /api/webhook` - Receive Meta webhooks
+
+
+
+## 📊 Database Schema#### Conversations
+
 - `GET /api/conversations` - List conversations
-- `GET /api/conversations/:id` - Get conversation details
-- `PATCH /api/conversations/:id` - Update conversation
 
-#### Analytics
-- `GET /api/analytics/dashboard` - Dashboard stats
-- `GET /api/analytics/messages` - Message charts
+Key models:- `GET /api/conversations/:id` - Get conversation details
+
+- **Tenant** - Multi-tenant organization- `PATCH /api/conversations/:id` - Update conversation
+
+- **AdminUser** - Users with role-based access
+
+- **Conversation** - WhatsApp conversations#### Analytics
+
+- **Message** - Individual messages (text, media, etc)- `GET /api/analytics/dashboard` - Dashboard stats
+
+- **Template** - Message templates- `GET /api/analytics/messages` - Message charts
+
+- **Contact** - Contact directory
 
 ## 🏗️ Architecture
 
+See `backend/prisma/schema.prisma` for full schema.
+
 ### Multi-Tenant Data Model
 
+## 🧪 Testing
+
 All data is scoped by `tenantId`. The schema enforces:
-- Tenant isolation at the database level
-- Per-tenant WABA credentials (encrypted)
-- Per-tenant rate limits
-- Per-tenant themes and branding
+
+### Backend Tests- Tenant isolation at the database level
+
+```bash- Per-tenant WABA credentials (encrypted)
+
+cd backend- Per-tenant rate limits
+
+npm test- Per-tenant themes and branding
+
+```
 
 ### Persist-First Pattern
 
-```
-Webhook → RawWebhookEvent (persist) → Queue Job → Worker → Message (processed)
+### Frontend Tests
+
+```bash```
+
+cd frontendWebhook → RawWebhookEvent (persist) → Queue Job → Worker → Message (processed)
+
+npm test```
+
 ```
 
 **Benefits:**
-- No message loss during outages
+
+## 📝 Meta WhatsApp Setup- No message loss during outages
+
 - Replay capability for recovery
-- Audit trail of all events
 
-### Queue Architecture
+1. Create Meta Business Account- Audit trail of all events
 
-```
-┌─────────────────┐
+2. Set up WhatsApp Business App
+
+3. Add Phone Number### Queue Architecture
+
+4. Generate Access Token
+
+5. Configure Webhook URL: `https://your-domain.com/api/webhook````
+
+6. Subscribe to webhook events: `messages`, `message_status`┌─────────────────┐
+
 │   API Server    │
-└────────┬────────┘
+
+## 🐛 Troubleshooting└────────┬────────┘
+
          │
-    ┌────▼─────┐
-    │  Redis   │  (BullMQ)
-    │  Queues  │
-    └────┬─────┘
+
+### Database Connection Issues    ┌────▼─────┐
+
+- Verify PostgreSQL is running    │  Redis   │  (BullMQ)
+
+- Check DATABASE_URL format    │  Queues  │
+
+- Run `npx prisma migrate deploy`    └────┬─────┘
+
          │
-    ┌────▼────────────────┐
-    │   Worker Process    │
-    ├─────────────────────┤
-    │ • webhook-processor │
+
+### Redis Connection Issues    ┌────▼────────────────┐
+
+- Redis is optional for development    │   Worker Process    │
+
+- Backend will warn but continue without queues    ├─────────────────────┤
+
+- For production, ensure Redis is running    │ • webhook-processor │
+
     │ • message-send      │
-    │ • campaign-runner   │
-    └─────────────────────┘
-```
+
+### WebSocket Issues    │ • campaign-runner   │
+
+- Check firewall settings    └─────────────────────┘
+
+- Verify VITE_WS_URL matches backend```
+
+- Check browser console for connection errors
 
 ### Rate Limiting
 
+## 🤝 Contributing
+
 Token bucket algorithm per tenant:
-- Configurable messages/minute per plan
-- Automatic refill at steady rate
-- Prevents Meta API limits violations
 
-## 🔐 Security
+1. Fork the repository- Configurable messages/minute per plan
 
-### Authentication
+2. Create feature branch (`git checkout -b feature/amazing-feature`)- Automatic refill at steady rate
+
+3. Commit changes (`git commit -m 'Add amazing feature'`)- Prevents Meta API limits violations
+
+4. Push to branch (`git push origin feature/amazing-feature`)
+
+5. Open Pull Request## 🔐 Security
+
+
+
+## 📄 License### Authentication
+
 - JWT with short-lived access tokens (7 days default)
-- Refresh tokens for seamless re-authentication
+
+This project is licensed under the MIT License.- Refresh tokens for seamless re-authentication
+
 - Tenant claims in JWT payload
 
+## 👥 Support
+
 ### Encryption
-- WABA access tokens encrypted at rest
-- AES-256-GCM encryption algorithm
-- **Production**: Use AWS KMS, Google Cloud KMS, or HashiCorp Vault
 
-### Best Practices
+For issues and questions:- WABA access tokens encrypted at rest
+
+- GitHub Issues: Create an issue- AES-256-GCM encryption algorithm
+
+- Documentation: [BACKEND.md](./BACKEND.md) | [FRONTEND.md](./FRONTEND.md)- **Production**: Use AWS KMS, Google Cloud KMS, or HashiCorp Vault
+
+
+
+## 🎯 Roadmap### Best Practices
+
 - All endpoints require authentication (except webhook & auth)
-- Tenant isolation enforced in middleware
-- Rate limiting on all public endpoints
-- Input validation with Zod
-- SQL injection protection via Prisma
-- CORS configured for frontend only
 
-## 📊 Monitoring & Logging
+- [ ] Docker containerization- Tenant isolation enforced in middleware
+
+- [ ] Kubernetes deployment configs- Rate limiting on all public endpoints
+
+- [ ] Advanced analytics and reporting- Input validation with Zod
+
+- [ ] WhatsApp catalog support- SQL injection protection via Prisma
+
+- [ ] Automated testing suite- CORS configured for frontend only
+
+- [ ] GraphQL API option
+
+- [ ] Mobile app (React Native)## 📊 Monitoring & Logging
+
 
 ### Structured Logging
 

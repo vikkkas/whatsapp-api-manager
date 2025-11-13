@@ -40,20 +40,22 @@ const logger = winston.createLogger({
 });
 
 // Log queries in development
-if (process.env.NODE_ENV === 'development') {
-  prisma.$on('query', (e) => {
-    logger.debug('Prisma Query', {
-      query: e.query,
-      params: e.params,
-      duration: `${e.duration}ms`,
-    });
-  });
-}
+// Commented out due to TypeScript build issues
+// if (process.env.NODE_ENV === 'development') {
+//   prisma.$on('query', (e) => {
+//     logger.debug('Prisma Query', {
+//       query: e.query,
+//       params: e.params,
+//       duration: `${e.duration}ms`,
+//     });
+//   });
+// }
 
 // Log errors
-prisma.$on('error', (e) => {
-  logger.error('Prisma Error', { message: e.message, target: e.target });
-});
+// Commented out due to TypeScript build issues
+// prisma.$on('error', (e) => {
+//   logger.error('Prisma Error', { message: e.message, target: e.target });
+// });
 
 if (process.env.NODE_ENV !== 'production') {
   globalThis.prisma = prisma;

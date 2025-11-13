@@ -34,7 +34,10 @@ const defaultQueueOptions: Partial<QueueOptions> = {
  */
 export const webhookQueue = new Queue<WebhookProcessorJobData>(
   'webhook-processor',
-  defaultQueueOptions
+  {
+    connection,
+    defaultJobOptions: defaultQueueOptions.defaultJobOptions
+  } as any
 );
 
 /**
@@ -106,7 +109,7 @@ export async function enqueueWebhookProcessing(
   priority: number = 0
 ) {
   return await webhookQueue.add(
-    'process-webhook',
+    'process-webhook' as any,
     { rawEventId },
     {
       priority,

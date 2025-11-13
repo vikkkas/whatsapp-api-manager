@@ -181,7 +181,9 @@ whatsapp-number-api-manager/
 │   │   │   ├── templates.ts       # Template management
 │   │   │   ├── settings.ts        # Settings API
 │   │   │   ├── analytics.ts       # Analytics endpoints
-│   │   │   └── health.ts          # Health checks
+│   │   │   ├── health.ts          # Health checks
+│   │   │   ├── media.ts           # File upload/serve
+│   │   │   └── contacts.ts        # Contact management
 │   │   ├── utils/
 │   │   │   ├── encryption.ts      # AES encryption + bcrypt
 │   │   │   ├── logger.ts          # Winston logger
@@ -203,14 +205,28 @@ whatsapp-number-api-manager/
 │   │   │   ├── MessageThread.tsx  # Message display
 │   │   │   ├── AppSidebar.tsx     # Navigation
 │   │   │   ├── DashboardLayout.tsx
-│   │   │   └── ProtectedRoute.tsx
+│   │   │   ├── ProtectedRoute.tsx
+│   │   │   ├── FileUpload.tsx     # File upload component
+│   │   │   └── FilePreview.tsx    # File preview component
+│   │   ├── contexts/
+│   │   │   └── AuthContext.tsx    # Auth provider & hooks
+│   │   ├── services/
+│   │   │   └── websocket.ts       # WebSocket service
+│   │   ├── stores/
+│   │   │   ├── authStore.ts       # Zustand auth state
+│   │   │   ├── conversationStore.ts
+│   │   │   ├── messageStore.ts
+│   │   │   └── uiStore.ts
 │   │   ├── pages/
 │   │   │   ├── Login.tsx          # Login page
 │   │   │   ├── Inbox.tsx          # Conversation list
 │   │   │   ├── SendMessage.tsx    # Send message UI
+│   │   │   ├── SendMessageEnhanced.tsx # Enhanced send with media
 │   │   │   ├── Templates.tsx      # Template management
+│   │   │   ├── TemplateManagement.tsx  # Full template CRUD
 │   │   │   ├── Settings.tsx       # Settings page
 │   │   │   ├── Analytics.tsx      # Analytics dashboard
+│   │   │   ├── ContactManagement.tsx   # Contact CRUD
 │   │   │   └── UserManagement.tsx
 │   │   ├── lib/
 │   │   │   ├── api.ts             # API client
@@ -301,37 +317,40 @@ VITE_BACKEND_URL=http://localhost:3000
 - [x] Redis + BullMQ integration
 - [x] Logging with Winston
 
-### 🔄 Phase 2: Frontend Integration (IN PROGRESS)
+### 🔄 Phase 2: Frontend Integration (COMPLETE ✅)
 - [x] API client with TypeScript
 - [x] Login page with demo credentials
 - [x] Inbox/conversation list
 - [x] Message thread component
-- [ ] Auth context & protected routes
-- [ ] Real-time updates (polling)
-- [ ] Send message UI
-- [ ] Template management UI
-- [ ] Settings page
-- [ ] Analytics dashboard
+- [x] Auth context & protected routes
+- [x] Real-time updates (WebSocket)
+- [x] Send message UI with file upload
+- [x] Template management UI
+- [x] Settings page (basic)
+- [x] Analytics dashboard (basic)
 
-### 📋 Phase 3: Core Features (PLANNED)
-- [ ] File upload for media messages
-- [ ] Template message sending
-- [ ] Agent assignment workflow
-- [ ] Conversation search & filters
-- [ ] Bulk messaging
-- [ ] Contact management
-- [ ] Tags & notes
-- [ ] Export conversations
+### ⚡ Phase 3: Core Features (IN PROGRESS - 70% Complete)
+- [x] File upload for media messages (images, videos, audio, documents)
+- [x] Template message management (create, edit, delete, preview)
+- [x] Contact management (CRUD, import/export CSV, search)
+- [x] WebSocket real-time updates (fully functional)
+- [ ] Agent assignment workflow (pending)
+- [ ] Advanced search & filters (pending)
+- [ ] Tags & notes (in progress)
+- [ ] Bulk messaging campaigns (pending)
+- [ ] Export conversations (PDF/CSV) (pending)
 
 ### 📋 Phase 4: Advanced Features (PLANNED)
-- [ ] WebSocket for real-time updates
+- [x] WebSocket for real-time updates (moved to Phase 3, completed)
 - [ ] Chatbot/auto-reply rules
 - [ ] Canned responses
 - [ ] Message scheduling
 - [ ] Campaign management
-- [ ] Analytics & reporting
+- [ ] Advanced analytics & reporting
 - [ ] Multi-language support
 - [ ] Keyboard shortcuts
+- [ ] Message templates with variables
+- [ ] Auto-assignment rules (round-robin, least busy)
 
 ### 📋 Phase 5: Production (PLANNED)
 - [ ] CI/CD with GitHub Actions
@@ -566,6 +585,32 @@ CMD ["npm", "start"]
 
 ---
 
-**Last Updated:** November 12, 2025  
-**Version:** 2.0.0  
-**Status:** Phase 2 - Frontend Integration In Progress
+**Last Updated:** November 13, 2025  
+**Version:** 2.5.0  
+**Status:** Phase 3 - Core Features (70% Complete)
+
+## Recent Updates (November 13, 2025)
+
+### Completed Features:
+- ✅ **WebSocket Real-Time Updates**: Full implementation with JWT auth, message/conversation events, typing indicators
+- ✅ **File Upload System**: Frontend FileUpload component with drag-and-drop, backend media routes, support for images/videos/audio/documents
+- ✅ **Template Management**: Complete CRUD with preview, search/filters, variable substitution
+- ✅ **Contact Management**: Full CRUD, import/export CSV, search, stats dashboard
+- ✅ **Enhanced Send Message UI**: Tabbed interface for different message types, file preview, captions
+- ✅ **AuthContext**: Centralized authentication with login/logout/refresh methods
+- ✅ **API Enhancements**: Added contactAPI, campaignAPI, enhanced templateAPI with all CRUD operations
+
+### Database Updates:
+- Added `Contact` model with relations to Tenant and Conversation
+- Updated Prisma schema with proper indexes and constraints
+- Contact-Conversation linking for better relationship tracking
+
+### In Progress:
+- 🔨 Tags & Notes system
+- 🔨 Agent assignment workflow
+- 🔨 Advanced search & filters
+
+### Upcoming:
+- Bulk messaging campaigns
+- Export functionality (PDF/CSV)
+- Advanced analytics

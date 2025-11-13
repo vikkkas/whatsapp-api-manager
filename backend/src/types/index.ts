@@ -8,6 +8,7 @@ import { JwtPayload } from 'jsonwebtoken';
 export interface AuthenticatedRequest extends Request {
   user?: {
     id: string;
+    userId: string; // Added for compatibility
     email: string;
     tenantId: string;
     role: string;

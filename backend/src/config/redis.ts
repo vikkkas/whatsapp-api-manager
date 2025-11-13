@@ -1,5 +1,6 @@
 import Redis from 'ioredis';
 import winston from 'winston';
+import type { RedisOptions } from 'ioredis';
 
 const logger = winston.createLogger({
   level: process.env.LOG_LEVEL || 'info',
@@ -7,7 +8,7 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
-const redisConfig: Redis.RedisOptions = {
+const redisConfig: RedisOptions = {
   maxRetriesPerRequest: null, // Required for BullMQ
   enableReadyCheck: false,
   connectTimeout: 10000, // 10 seconds
