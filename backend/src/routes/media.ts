@@ -3,8 +3,8 @@ import multer from 'multer';
 import path from 'path';
 import fs from 'fs/promises';
 import { v4 as uuidv4 } from 'uuid';
-import { authenticate } from '../middleware/auth';
-import { logger } from '../utils/logger';
+import { authenticate } from '../middleware/auth.js';
+import { logger } from '../utils/logger.js';
 
 const router = Router();
 

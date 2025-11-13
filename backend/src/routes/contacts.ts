@@ -1,5 +1,5 @@
 import { Router, Request, Response } from 'express';
-import { authenticate } from '../middleware/auth';
+import { authenticate } from '../middleware/auth.js';
 import prisma from '../config/prisma.js';
 import { log } from '../utils/logger.js';
 import { Parser } from 'json2csv';

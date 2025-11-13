@@ -1,1 +1,0 @@
-{"version":3,"file":"webhook-processor.d.ts","sourceRoot":"","sources":["../../src/workers/webhook-processor.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,MAAM,EAAO,MAAM,QAAQ,CAAC;AAQrC,UAAU,UAAU;IAClB,UAAU,EAAE,MAAM,CAAC;CACpB;AAMD,eAAO,MAAM,aAAa,iCAiGzB,CAAC;AAqLF,eAAe,aAAa,CAAC"}

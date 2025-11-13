@@ -86,3 +86,4 @@ jspm_packages/
 .idea/
 *.swp
 *.swo
+dist
