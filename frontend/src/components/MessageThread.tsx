@@ -15,7 +15,14 @@ import {
   Phone, 
   MoreVertical,
   Check,
-  CheckCheck
+  CheckCheck,
+  Clock,
+  XCircle,
+  Paperclip,
+  Image as ImageIcon,
+  Video,
+  File,
+  MessageSquare
 } from 'lucide-react';
 import { formatDistanceToNow, format, isSameDay } from 'date-fns';
 import {
@@ -24,7 +31,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface Props {
   conversationId: string;
@@ -161,14 +168,78 @@ export function MessageThread({ conversationId, onBack }: Props) {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'SENT':
       case 'PENDING':
-        return <Check className="h-3 w-3" />;
+        return <Clock className="h-3 w-3 text-gray-400" />;
+      case 'SENT':
+        return <Check className="h-3 w-3 text-gray-400" />;
       case 'DELIVERED':
+        return <CheckCheck className="h-3 w-3 text-gray-400" />;
       case 'READ':
-        return <CheckCheck className="h-3 w-3 text-blue-500" />;
+        return <CheckCheck className="h-3 w-3 text-blue-400" />;
       case 'FAILED':
-        return <span className="text-red-500 text-xs">!</span>;
+        return <XCircle className="h-3 w-3 text-red-500" />;
+      default:
+        return null;
+    }
+  };
+
+  const renderMediaPreview = (message: any) => {
+    switch (message.type) {
+      case 'IMAGE':
+        return (
+          <div className="relative group">
+            <img 
+              src={message.mediaUrl} 
+              alt="Image" 
+              className="rounded-lg max-w-full h-auto cursor-pointer hover:opacity-90 transition-opacity"
+              style={{ maxHeight: '300px', objectFit: 'cover' }}
+            />
+            {message.caption && (
+              <p className="mt-2 text-sm">{message.caption}</p>
+            )}
+          </div>
+        );
+      
+      case 'VIDEO':
+        return (
+          <div>
+            <video 
+              src={message.mediaUrl} 
+              controls 
+              className="rounded-lg max-w-full h-auto"
+              style={{ maxHeight: '300px' }}
+            />
+            {message.caption && (
+              <p className="mt-2 text-sm">{message.caption}</p>
+            )}
+          </div>
+        );
+      
+      case 'AUDIO':
+        return (
+          <div className="flex items-center gap-2 p-2 bg-white bg-opacity-10 rounded-lg">
+            <div className="flex-1">
+              <audio src={message.mediaUrl} controls className="w-full" />
+            </div>
+          </div>
+        );
+      
+      case 'DOCUMENT':
+        return (
+          <a 
+            href={message.mediaUrl} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 bg-white bg-opacity-10 rounded-lg hover:bg-opacity-20 transition-all"
+          >
+            <File className="h-8 w-8" />
+            <div className="flex-1 min-w-0">
+              <p className="font-medium truncate">{message.filename || 'Document'}</p>
+              <p className="text-xs opacity-70">Click to download</p>
+            </div>
+          </a>
+        );
+      
       default:
         return null;
     }
@@ -178,72 +249,56 @@ export function MessageThread({ conversationId, onBack }: Props) {
     const isOutbound = message.direction === 'OUTBOUND';
     const prevMessage = messages[index - 1];
     const showDateDivider = !prevMessage || !isSameDay(new Date(message.createdAt), new Date(prevMessage.createdAt));
+    const showTail = index === messages.length - 1 || messages[index + 1]?.direction !== message.direction;
 
     return (
       <div key={message.id}>
         {showDateDivider && (
-          <div className="flex justify-center my-4">
-            <Badge variant="outline" className="bg-gray-100">
+          <div className="flex justify-center my-6">
+            <Badge variant="secondary" className="bg-white shadow-sm px-3 py-1 text-xs font-medium">
               {format(new Date(message.createdAt), 'MMMM d, yyyy')}
             </Badge>
           </div>
         )}
         
-        <div className={`flex mb-4 ${isOutbound ? 'justify-end' : 'justify-start'}`}>
-          <div className={`max-w-[70%] ${isOutbound ? 'order-2' : 'order-1'}`}>
-            <Card className={`p-3 ${isOutbound ? 'bg-blue-500 text-white' : 'bg-white'}`}>
-              {message.type === 'TEXT' && (
-                <p className="whitespace-pre-wrap break-words">{message.text}</p>
-              )}
-              
-              {message.type === 'IMAGE' && (
-                <div>
-                  <img 
-                    src={message.mediaUrl} 
-                    alt="Image" 
-                    className="rounded max-w-full h-auto mb-2"
-                  />
-                  {message.caption && <p className="text-sm">{message.caption}</p>}
-                </div>
-              )}
-              
-              {message.type === 'VIDEO' && (
-                <div>
-                  <video 
-                    src={message.mediaUrl} 
-                    controls 
-                    className="rounded max-w-full h-auto mb-2"
-                  />
-                  {message.caption && <p className="text-sm">{message.caption}</p>}
-                </div>
-              )}
-              
-              {message.type === 'AUDIO' && (
-                <audio src={message.mediaUrl} controls className="w-full" />
-              )}
-              
-              {message.type === 'DOCUMENT' && (
-                <div>
-                  <a 
-                    href={message.mediaUrl} 
-                    target="_blank" 
-                    rel="noopener noreferrer"
-                    className="text-blue-300 underline"
-                  >
-                    📄 {message.filename || 'Download Document'}
-                  </a>
-                </div>
+        <div className={`flex mb-2 px-4 ${isOutbound ? 'justify-end' : 'justify-start'}`}>
+          <div 
+            className={`max-w-[75%] sm:max-w-[65%] ${isOutbound ? 'ml-auto' : 'mr-auto'}`}
+          >
+            <div 
+              className={`
+                relative px-4 py-2 rounded-2xl shadow-sm
+                ${isOutbound 
+                  ? 'bg-blue-500 text-white rounded-br-md' 
+                  : 'bg-white text-gray-900 rounded-bl-md border border-gray-200'
+                }
+                ${showTail && isOutbound ? 'rounded-br-sm' : ''}
+                ${showTail && !isOutbound ? 'rounded-bl-sm' : ''}
+              `}
+            >
+              {/* Message content */}
+              {message.type === 'TEXT' ? (
+                <p className="whitespace-pre-wrap break-words leading-relaxed">
+                  {message.text}
+                </p>
+              ) : (
+                renderMediaPreview(message)
               )}
 
-              <div className={`flex items-center justify-between mt-1 text-xs ${isOutbound ? 'text-blue-100' : 'text-gray-500'}`}>
-                <span>{format(new Date(message.createdAt), 'HH:mm')}</span>
+              {/* Timestamp and status */}
+              <div className={`flex items-center justify-end gap-1 mt-1 ${
+                isOutbound ? 'text-blue-100' : 'text-gray-500'
+              }`}>
+                <span className="text-[10px] font-medium">
+                  {format(new Date(message.createdAt), 'HH:mm')}
+                </span>
                 {isOutbound && (
-                  <span className="ml-2 flex items-center">
+                  <span className="flex items-center">
                     {getStatusIcon(message.status)}
                   </span>
                 )}
               </div>
-            </Card>
+            </div>
           </div>
         </div>
       </div>
@@ -252,8 +307,9 @@ export function MessageThread({ conversationId, onBack }: Props) {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+      <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-gray-50 to-gray-100">
+        <Loader2 className="h-10 w-10 animate-spin text-blue-500 mb-4" />
+        <p className="text-gray-600 font-medium">Loading conversation...</p>
       </div>
     );
   }
@@ -267,95 +323,133 @@ export function MessageThread({ conversationId, onBack }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="flex-none p-4 border-b bg-white flex items-center justify-between">
-        <div className="flex items-center gap-3">
+    <div className="flex flex-col h-full bg-gray-50">
+      {/* Header - Modern WhatsApp-like */}
+      <div className="flex-none px-4 py-3 bg-white border-b shadow-sm flex items-center justify-between">
+        <div className="flex items-center gap-3 flex-1 min-w-0">
           {onBack && (
-            <Button variant="ghost" size="sm" onClick={onBack}>
+            <Button variant="ghost" size="icon" onClick={onBack} className="flex-shrink-0">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
           
-          <Avatar className="h-10 w-10">
-            <AvatarFallback>
-              {conversation.contactName?.[0] || conversation.contactPhone?.[0] || '?'}
+          <Avatar className="h-11 w-11 flex-shrink-0 ring-2 ring-blue-100">
+            <AvatarFallback className="bg-gradient-to-br from-blue-400 to-blue-600 text-white font-semibold">
+              {conversation.contactName?.[0]?.toUpperCase() || conversation.contactPhone?.[0] || '?'}
             </AvatarFallback>
           </Avatar>
           
-          <div>
-            <h2 className="font-semibold">{conversation.contactName || conversation.contactPhone}</h2>
+          <div className="flex-1 min-w-0">
+            <h2 className="font-semibold text-gray-900 truncate">
+              {conversation.contactName || 'Unknown'}
+            </h2>
             <div className="flex items-center gap-2 text-sm text-gray-500">
               <Phone className="h-3 w-3" />
-              <span>{conversation.contactPhone}</span>
-              {isConnected && (
-                <Badge variant="outline" className="text-xs bg-green-50 text-green-700">
-                  Live
-                </Badge>
-              )}
+              <span className="truncate">{conversation.contactPhone}</span>
             </div>
           </div>
         </div>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="sm">
-              <MoreVertical className="h-5 w-5" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleResolve}>
-              Mark as Resolved
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={handleArchive} className="text-red-600">
-              Archive Conversation
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          {isConnected && (
+            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+              <div className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse" />
+              Live
+            </Badge>
+          )}
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <MoreVertical className="h-5 w-5" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuItem onClick={handleResolve} className="cursor-pointer">
+                <CheckCheck className="h-4 w-4 mr-2" />
+                Mark as Resolved
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={handleArchive} className="text-red-600 cursor-pointer">
+                <XCircle className="h-4 w-4 mr-2" />
+                Archive Conversation
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      {/* Messages */}
-      <div className="flex-1 overflow-y-auto p-4 bg-gray-50">
+      {/* Messages Area - WhatsApp-like background */}
+      <div 
+        className="flex-1 overflow-y-auto py-4"
+        style={{
+          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e5e7eb' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+          backgroundColor: '#f0f2f5'
+        }}
+      >
         {messages.length === 0 ? (
-          <div className="flex items-center justify-center h-full text-gray-500">
-            <p>No messages yet. Start the conversation!</p>
+          <div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
+            <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-md">
+              <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
+              <p className="text-lg font-medium text-gray-700 mb-2">No messages yet</p>
+              <p className="text-sm text-gray-500">
+                Start the conversation by sending a message below
+              </p>
+            </div>
           </div>
         ) : (
           <>
             {messages.map((message, index) => renderMessage(message, index))}
+            
+            {/* Typing indicator */}
             {isTyping && (
-              <div className="flex justify-start mb-4">
-                <Card className="p-3 bg-white">
+              <div className="flex justify-start mb-4 px-4">
+                <div className="bg-white rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm border border-gray-200">
                   <div className="flex gap-1">
                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
                     <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                   </div>
-                </Card>
+                </div>
               </div>
             )}
+            
             <div ref={messagesEndRef} />
           </>
         )}
       </div>
 
-      {/* Input */}
-      <div className="flex-none p-4 border-t bg-white">
-        <form onSubmit={handleSendMessage} className="flex gap-2">
-          <Input
-            ref={inputRef}
-            type="text"
-            placeholder="Type a message..."
-            value={newMessage}
-            onChange={(e) => {
-              setNewMessage(e.target.value);
-              handleTyping();
-            }}
-            onKeyPress={handleKeyPress}
-            disabled={isSending}
-            className="flex-1"
-          />
-          <Button type="submit" disabled={!newMessage.trim() || isSending}>
+      {/* Input Area - Modern design */}
+      <div className="flex-none px-4 py-3 bg-white border-t shadow-lg">
+        <form onSubmit={handleSendMessage} className="flex items-end gap-2">
+          <div className="flex-1 relative">
+            <Input
+              ref={inputRef}
+              type="text"
+              placeholder="Type a message..."
+              value={newMessage}
+              onChange={(e) => {
+                setNewMessage(e.target.value);
+                handleTyping();
+              }}
+              onKeyPress={handleKeyPress}
+              disabled={isSending}
+              className="pr-10 py-6 rounded-full border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            />
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+            >
+              <Paperclip className="h-5 w-5" />
+            </Button>
+          </div>
+          
+          <Button 
+            type="submit" 
+            disabled={!newMessage.trim() || isSending}
+            className="rounded-full h-12 w-12 p-0 bg-blue-500 hover:bg-blue-600 shadow-lg disabled:opacity-50"
+          >
             {isSending ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (

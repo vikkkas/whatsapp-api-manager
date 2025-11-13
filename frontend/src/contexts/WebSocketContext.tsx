@@ -3,7 +3,7 @@ import { useAuthStore } from '../store/authStore';
 import { useConversationStore } from '../store/conversationStore';
 import { useMessageStore } from '../store/messageStore';
 import websocketService from '../services/websocket';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 interface WebSocketContextType {
   isConnected: boolean;

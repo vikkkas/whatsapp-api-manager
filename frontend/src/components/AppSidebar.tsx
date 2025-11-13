@@ -1,4 +1,4 @@
-import { MessageSquare, Send, BarChart3, FileText, Settings, LogOut, User } from "lucide-react";
+import { MessageSquare, FileText, Settings, LogOut, User, BarChart3 } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -17,15 +17,10 @@ import { Button } from "./ui/button";
 import { useState } from "react";
 
 const items = [
-  { title: "Inbox", url: "/", icon: MessageSquare },
-  // { title: "Send Message", url: "/send", icon: Send },
-  { title: "Analytics", url: "/analytics", icon: BarChart3 },
+  { title: "Inbox", url: "/inbox", icon: MessageSquare },
   { title: "Templates", url: "/templates", icon: FileText },
-  // { title: "Settings", url: "/settings", icon: Settings },
-];
-
-const adminItems = [
-  { title: "User Management", url: "/users", icon: User },
+  { title: "Analytics", url: "/analytics", icon: BarChart3 },
+  { title: "Settings", url: "/settings", icon: Settings },
 ];
 
 export function AppSidebar() {
@@ -34,10 +29,6 @@ export function AppSidebar() {
   const navigate = useNavigate();
   const [isLoggingOut, setIsLoggingOut] = useState(false);
   const currentUser = authAPI.getCurrentUser();
-  const isAdmin = currentUser?.role === 'admin';
-
-  // Combine items based on user role
-  const allItems = isAdmin ? [...items, ...adminItems] : items;
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -62,7 +53,7 @@ export function AppSidebar() {
           </SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
-              {allItems.map((item) => (
+              {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild>
                     <NavLink

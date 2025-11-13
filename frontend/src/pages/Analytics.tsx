@@ -1,14 +1,32 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from "recharts";
 import { MessageSquare, Users, TrendingUp, Target, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { analyticsAPI, type Analytics } from "@/lib/api";
+import { analyticsAPI } from "@/lib/api";
 import { useEffect, useState } from "react";
 
-const COLORS = ["hsl(142, 76%, 40%)", "hsl(210, 100%, 55%)", "hsl(45, 93%, 47%)", "hsl(0, 84%, 60%)"];
+interface AnalyticsData {
+  overview: {
+    totalMessages: number;
+    totalConversations: number;
+    deliveryRate: number;
+    averageResponseTime: number;
+    sentToday: number;
+    sentThisWeek: number;
+    sentThisMonth: number;
+  };
+  messagesByStatus?: Record<string, number>;
+  messagesByType?: Record<string, number>;
+  conversationsByStatus?: Record<string, number>;
+  dailyActivity?: Array<{
+    date: string;
+    sent: number;
+    received: number;
+  }>;
+}
 
 export default function Analytics() {
-  const [analytics, setAnalytics] = useState<Analytics | null>(null);
+  const [analytics, setAnalytics] = useState<AnalyticsData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -51,7 +69,7 @@ export default function Analytics() {
     );
   }
 
-  if (!analytics) {
+  if (!analytics || !analytics.overview) {
     return (
       <div className="text-center text-muted-foreground">
         No analytics data available
@@ -62,31 +80,31 @@ export default function Analytics() {
   const stats = [
     {
       title: "Total Messages",
-      value: analytics.overview.totalMessages.toLocaleString(),
+      value: (analytics.overview.totalMessages || 0).toLocaleString(),
       icon: MessageSquare,
-      change: `+${analytics.overview.recentMessages}`,
+      change: `+${analytics.overview.sentToday || 0}`,
       subtitle: "last 30 days"
     },
     {
-      title: "Active Users",
-      value: analytics.overview.activeUsers.toLocaleString(),
+      title: "Total Conversations",
+      value: (analytics.overview.totalConversations || 0).toLocaleString(),
       icon: Users,
-      change: `${analytics.overview.totalUsers} total`,
-      subtitle: "active users"
+      change: `${analytics.overview.totalConversations || 0} total`,
+      subtitle: "conversations"
     },
     {
-      title: "Avg. Response Time",
-      value: analytics.overview.avgResponseTime,
+      title: "Delivery Rate",
+      value: `${analytics.overview.deliveryRate || 0}%`,
       icon: TrendingUp,
-      change: "Automated",
-      subtitle: "response time"
+      change: "Success rate",
+      subtitle: "delivery rate"
     },
     {
-      title: "Message Distribution",
-      value: `${Math.round((analytics.overview.inboundMessages / analytics.overview.totalMessages) * 100)}%`,
+      title: "Sent This Week",
+      value: (analytics.overview.sentThisWeek || 0).toLocaleString(),
       icon: Target,
-      change: `${analytics.overview.inboundMessages}:${analytics.overview.outboundMessages}`,
-      subtitle: "inbound ratio"
+      change: `${analytics.overview.sentToday || 0} today`,
+      subtitle: "messages sent"
     },
   ];
 
@@ -119,18 +137,17 @@ export default function Analytics() {
         ))}
       </div>
 
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Messages per Day */}
-        <Card>
+      {/* Daily Activity Chart */}
+      {analytics.dailyActivity && analytics.dailyActivity.length > 0 && (
+        <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Messages per Day (Last 30 Days)</CardTitle>
+            <CardTitle>Daily Activity (Last 7 Days)</CardTitle>
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={analytics.charts.messagesPerDay}>
+              <BarChart data={analytics.dailyActivity}>
                 <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
-                <XAxis dataKey="_id" stroke="hsl(var(--muted-foreground))" />
+                <XAxis dataKey="date" stroke="hsl(var(--muted-foreground))" />
                 <YAxis stroke="hsl(var(--muted-foreground))" />
                 <Tooltip
                   contentStyle={{
@@ -140,128 +157,32 @@ export default function Analytics() {
                   }}
                 />
                 <Legend />
-                <Bar dataKey="inbound" fill="hsl(142, 76%, 40%)" name="Inbound" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="outbound" fill="hsl(210, 100%, 55%)" name="Outbound" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="sent" fill="hsl(210, 100%, 55%)" name="Sent" radius={[4, 4, 0, 0]} />
+                <Bar dataKey="received" fill="hsl(142, 76%, 40%)" name="Received" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
         </Card>
+      )}
 
-        {/* Message Distribution */}
-        <Card>
+      {/* Message Status Distribution */}
+      {analytics.messagesByStatus && (
+        <Card className="mt-6">
           <CardHeader>
-            <CardTitle>Message Distribution</CardTitle>
+            <CardTitle>Message Status Distribution</CardTitle>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={[
-                    { name: 'Inbound', value: analytics.charts.messageDistribution.inbound },
-                    { name: 'Outbound', value: analytics.charts.messageDistribution.outbound }
-                  ]}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }: { name: string; percent: number }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {[
-                    { name: 'Inbound', value: analytics.charts.messageDistribution.inbound },
-                    { name: 'Outbound', value: analytics.charts.messageDistribution.outbound }
-                  ].map((entry, index) => (
-                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                  ))}
-                </Pie>
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: "hsl(var(--card))",
-                    border: "1px solid hsl(var(--border))",
-                    borderRadius: "var(--radius)",
-                  }}
-                />
-                <Legend />
-              </PieChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Top Users Table */}
-      <Card className="mt-6">
-        <CardHeader>
-          <CardTitle>Top Active Users</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b">
-                  <th className="text-left py-2">Phone Number</th>
-                  <th className="text-left py-2">Name</th>
-                  <th className="text-left py-2">Messages</th>
-                  <th className="text-left py-2">Last Message</th>
-                </tr>
-              </thead>
-              <tbody>
-                {analytics.topUsers.length > 0 ? (
-                  analytics.topUsers.map((user, index) => (
-                    <tr key={index} className="border-b">
-                      <td className="py-2 font-mono text-sm">{user.phone}</td>
-                      <td className="py-2">{user.name || 'Unknown'}</td>
-                      <td className="py-2">{user.messageCount}</td>
-                      <td className="py-2 text-sm text-muted-foreground">
-                        {new Date(user.lastMessage).toLocaleDateString()}
-                      </td>
-                    </tr>
-                  ))
-                ) : (
-                  <tr>
-                    <td colSpan={4} className="py-4 text-center text-muted-foreground">
-                      No user data available
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Templates Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <MessageSquare className="h-5 w-5 text-muted-foreground" />
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              {Object.entries(analytics.messagesByStatus).map(([status, count]) => (
+                <div key={status} className="p-4 border rounded-lg">
+                  <p className="text-sm font-medium text-muted-foreground capitalize">{status}</p>
+                  <p className="text-2xl font-bold mt-1">{count as number}</p>
+                </div>
+              ))}
             </div>
-            <p className="text-2xl font-bold text-foreground">{analytics.templates.total}</p>
-            <p className="text-sm text-muted-foreground mt-1">Total Templates</p>
           </CardContent>
         </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <TrendingUp className="h-5 w-5 text-green-500" />
-            </div>
-            <p className="text-2xl font-bold text-foreground">{analytics.templates.approved}</p>
-            <p className="text-sm text-muted-foreground mt-1">Approved Templates</p>
-          </CardContent>
-        </Card>
-        
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between mb-2">
-              <Target className="h-5 w-5 text-yellow-500" />
-            </div>
-            <p className="text-2xl font-bold text-foreground">{analytics.templates.pending}</p>
-            <p className="text-sm text-muted-foreground mt-1">Pending Templates</p>
-          </CardContent>
-        </Card>
-      </div>
+      )}
     </div>
   );
 }

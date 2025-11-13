@@ -1,5 +1,5 @@
 import { io, Socket } from 'socket.io-client';
-import toast from 'react-hot-toast';
+import { toast } from 'sonner';
 
 const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 
