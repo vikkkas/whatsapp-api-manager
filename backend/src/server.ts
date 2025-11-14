@@ -54,9 +54,16 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.includes(origin) || origin.includes('localhost')) {
+    // In development, allow all localhost origins
+    if (process.env.NODE_ENV !== 'production' && origin.includes('localhost')) {
+      return callback(null, true);
+    }
+    
+    // Check allowlist
+    if (allowedOrigins.includes(origin)) {
       callback(null, true);
     } else {
+      log.warn(`CORS blocked origin: ${origin}. Allowed origins: ${allowedOrigins.join(', ')}`);
       callback(new Error('Not allowed by CORS'));
     }
   },

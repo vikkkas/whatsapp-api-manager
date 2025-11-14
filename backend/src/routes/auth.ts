@@ -34,6 +34,7 @@ interface JWTPayload {
 }
 
 function generateToken(payload: JWTPayload): string {
+  console.log('Generating token with JWT_SECRET:', process.env.JWT_SECRET ? process.env.JWT_SECRET : '✗ NOT SET');
   return jwt.sign(payload, process.env.JWT_SECRET!, {
     expiresIn: process.env.JWT_EXPIRES_IN || '7d',
   } as jwt.SignOptions);
