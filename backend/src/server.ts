@@ -14,7 +14,8 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables
-dotenv.config();
+// In production, dotenv looks in current directory, not dist/
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // Import routes
 import webhookRoutes from './routes/webhook.js';

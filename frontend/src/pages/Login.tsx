@@ -10,8 +10,8 @@ import { authAPI } from '../lib/api';
 
 const Login = () => {
   const [credentials, setCredentials] = useState({
-    email: 'admin@gmail.com',
-    password: 'admin123456'
+    email: 'admin@demo.com',
+    password: 'admin123'
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');

@@ -3,7 +3,11 @@ import jwt from 'jsonwebtoken';
 import prisma from '../config/prisma.js';
 import { log } from '../utils/logger.js';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+if (!process.env.JWT_SECRET) {
+  throw new Error('JWT_SECRET environment variable is required');
+}
+
+const JWT_SECRET = process.env.JWT_SECRET;
 
 // Extend Express Request to include user
 declare global {
