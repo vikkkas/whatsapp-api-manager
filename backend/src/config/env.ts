@@ -7,7 +7,7 @@ const __dirname = path.dirname(__filename);
 
 // Load environment variables FIRST before anything else
 // In production, dotenv looks in current directory, not dist/
-dotenv.config({ path: path.resolve(__dirname, '../../../.env') });
+dotenv.config({ path: path.resolve(__dirname, '../../.env') });
 
 // Validate critical environment variables
 const requiredEnvVars = [
