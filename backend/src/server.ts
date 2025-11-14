@@ -1,40 +1,17 @@
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
-import dotenv from 'dotenv';
 import morgan from 'morgan';
 import helmet from 'helmet';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer } from 'http';
+import { env } from './config/env.js'; // Load env FIRST
 import prisma from './config/prisma.js';
 import { log, httpLogStream } from './utils/logger.js';
 import { setupWebSocket } from './services/websocket.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-
-// Load environment variables
-// Try multiple paths to find .env file
-const envPaths = [
-  path.resolve(__dirname, '../../.env'),  // For dist/server.js -> backend/.env
-  path.resolve(process.cwd(), '.env'),    // For CWD/.env
-  path.resolve(__dirname, '../.env'),     // Fallback
-];
-
-let envLoaded = false;
-for (const envPath of envPaths) {
-  const result = dotenv.config({ path: envPath });
-  if (!result.error) {
-    console.log(`✅ Loaded environment from: ${envPath}`);
-    envLoaded = true;
-    break;
-  }
-}
-
-if (!envLoaded) {
-  console.warn('⚠️  No .env file found. Using system environment variables.');
-  dotenv.config(); // Try default locations
-}
 
 // Import routes
 import webhookRoutes from './routes/webhook.js';
@@ -48,20 +25,8 @@ import healthRoutes from './routes/health.js';
 import mediaRoutes from './routes/media.js';
 import contactRoutes from './routes/contacts.js';
 
-// Validate required environment variables
-const requiredEnvVars = ['PORT', 'DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];
-const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
-
-if (missingEnvVars.length > 0) {
-  console.error('❌ Missing required environment variables:', missingEnvVars.join(', '));
-  console.error('💡 Make sure .env file exists or set these as system environment variables');
-  console.error(`📁 Current working directory: ${process.cwd()}`);
-  console.error(`📁 Script directory: ${__dirname}`);
-  process.exit(1);
-}
-
 const app: Express = express();
-const PORT = process.env.PORT;
+const PORT = env.PORT;
 
 // ============================================
 // SECURITY MIDDLEWARE
@@ -77,7 +42,7 @@ const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:8080',
   'http://localhost:3000',
-  process.env.FRONTEND_URL
+  env.FRONTEND_URL
 ].filter(Boolean);
 
 app.use(cors({
@@ -86,7 +51,7 @@ app.use(cors({
     if (!origin) return callback(null, true);
     
     // In development, allow all localhost origins
-    if (process.env.NODE_ENV !== 'production' && origin.includes('localhost')) {
+    if (env.NODE_ENV !== 'production' && origin.includes('localhost')) {
       return callback(null, true);
     }
     
@@ -188,7 +153,7 @@ app.use((err: ApiError, req: Request, res: Response, _next: NextFunction) => {
   res.status(statusCode).json({
     success: false,
     error: message,
-    ...(process.env.NODE_ENV === 'development' && { stack: err.stack })
+    ...(env.NODE_ENV === 'development' && { stack: err.stack })
   });
 });
 
@@ -202,7 +167,7 @@ const io = setupWebSocket(httpServer);
 
 const server = httpServer.listen(PORT, () => {
   log.info(`🚀 Server started on port ${PORT}`);
-  log.info(`📝 Environment: ${process.env.NODE_ENV || 'development'}`);
+  log.info(`📝 Environment: ${env.NODE_ENV}`);
   log.info(`🔗 API Documentation: http://localhost:${PORT}/api/docs`);
   log.info(`❤️  Health Check: http://localhost:${PORT}/api/health`);
   log.info(`🔌 WebSocket server initialized`);
@@ -243,7 +208,7 @@ process.on('SIGINT', () => gracefulShutdown('SIGINT'));
 process.on('unhandledRejection', (reason: any, promise: Promise<any>) => {
   log.error('Unhandled Rejection', { reason, promise });
   // Don't exit in development
-  if (process.env.NODE_ENV === 'production') {
+  if (env.NODE_ENV === 'production') {
     gracefulShutdown('UNHANDLED_REJECTION');
   }
 });

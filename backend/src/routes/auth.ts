@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import jwt from 'jsonwebtoken';
 import { z } from 'zod';
 import prisma from '../config/prisma.js';
+import { env } from '../config/env.js';
 import { hashPassword, comparePassword } from '../utils/encryption.js';
 import { log } from '../utils/logger.js';
 
@@ -34,15 +35,14 @@ interface JWTPayload {
 }
 
 function generateToken(payload: JWTPayload): string {
-  console.log('Generating token with JWT_SECRET:', process.env.JWT_SECRET ? process.env.JWT_SECRET : '✗ NOT SET');
-  return jwt.sign(payload, process.env.JWT_SECRET!, {
-    expiresIn: process.env.JWT_EXPIRES_IN || '7d',
+  return jwt.sign(payload, env.JWT_SECRET, {
+    expiresIn: env.JWT_EXPIRES_IN,
   } as jwt.SignOptions);
 }
 
 function generateRefreshToken(payload: JWTPayload): string {
-  return jwt.sign(payload, process.env.JWT_REFRESH_SECRET!, {
-    expiresIn: process.env.JWT_REFRESH_EXPIRES_IN || '30d',
+  return jwt.sign(payload, env.JWT_REFRESH_SECRET, {
+    expiresIn: env.JWT_REFRESH_EXPIRES_IN,
   } as jwt.SignOptions);
 }
 
@@ -290,7 +290,7 @@ router.post('/refresh', async (req: Request, res: Response) => {
     }
 
     // Verify refresh token
-    const decoded = jwt.verify(refreshToken, process.env.JWT_REFRESH_SECRET!) as JWTPayload;
+    const decoded = jwt.verify(refreshToken, env.JWT_REFRESH_SECRET) as JWTPayload;
 
     // Verify user still exists and is active
     const user = await prisma.adminUser.findUnique({
@@ -345,7 +345,7 @@ router.get('/me', async (req: Request, res: Response) => {
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, process.env.JWT_SECRET!) as JWTPayload;
+    const decoded = jwt.verify(token, env.JWT_SECRET) as JWTPayload;
 
     // Get user data
     const user = await prisma.adminUser.findUnique({

@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import bcryptjs from 'bcryptjs';
+import { env } from '../config/env.js';
 
 const ALGORITHM = 'aes-256-gcm';
 const IV_LENGTH = 16;
@@ -19,7 +20,7 @@ function getKey(password: string, salt: Buffer): Buffer {
  * In production, use AWS KMS, Google Cloud KMS, or HashiCorp Vault
  */
 export function encrypt(text: string): string {
-  const password = process.env.ENCRYPTION_KEY;
+  const password = env.ENCRYPTION_KEY;
   
   if (!password || password.length < 32) {
     throw new Error('ENCRYPTION_KEY must be at least 32 characters');
@@ -44,7 +45,7 @@ export function encrypt(text: string): string {
  * Decrypt sensitive data
  */
 export function decrypt(encryptedData: string): string {
-  const password = process.env.ENCRYPTION_KEY;
+  const password = env.ENCRYPTION_KEY;
   
   if (!password || password.length < 32) {
     throw new Error('ENCRYPTION_KEY must be at least 32 characters');

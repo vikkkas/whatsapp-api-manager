@@ -1,10 +1,8 @@
-import { Request, Response, NextFunction } from 'express';
-import jwt from 'jsonwebtoken';
-import prisma from '../config/prisma.js';
-import { log } from '../utils/logger.js';
-
-// JWT_SECRET will be checked when first used
-const JWT_SECRET = process.env.JWT_SECRET;
+import { Request, Response, NextFunction } from "express";
+import jwt from "jsonwebtoken";
+import prisma from "../config/prisma.js";
+import { log } from "../utils/logger.js";
+import { env } from "../config/env.js";
 
 // Extend Express Request to include user
 declare global {
@@ -24,18 +22,22 @@ declare global {
 /**
  * Verify JWT token and attach user to request
  */
-export async function authenticate(req: Request, res: Response, next: NextFunction) {
+export async function authenticate(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return res.status(401).json({ error: 'No token provided' });
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return res.status(401).json({ error: "No token provided" });
     }
 
     const token = authHeader.substring(7);
 
-    // Verify token
-    const decoded = jwt.verify(token, JWT_SECRET) as {
+    // Verify token using env config
+    const decoded = jwt.verify(token, env.JWT_SECRET) as {
       userId: string;
       tenantId: string;
       email: string;
@@ -49,16 +51,16 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
     });
 
     if (!user) {
-      return res.status(401).json({ error: 'User not found' });
+      return res.status(401).json({ error: "User not found" });
     }
 
     // Check tenant status
-    if (user.tenant.status === 'SUSPENDED') {
-      return res.status(403).json({ error: 'Account suspended' });
+    if (user.tenant.status === "SUSPENDED") {
+      return res.status(403).json({ error: "Account suspended" });
     }
 
-    if (user.tenant.status === 'CANCELLED') {
-      return res.status(403).json({ error: 'Account cancelled' });
+    if (user.tenant.status === "CANCELLED") {
+      return res.status(403).json({ error: "Account cancelled" });
     }
 
     // Attach user info to request
@@ -73,16 +75,16 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
 
     next();
   } catch (error: any) {
-    if (error.name === 'JsonWebTokenError') {
-      return res.status(401).json({ error: 'Invalid token' });
+    if (error.name === "JsonWebTokenError") {
+      return res.status(401).json({ error: "Invalid token" });
     }
 
-    if (error.name === 'TokenExpiredError') {
-      return res.status(401).json({ error: 'Token expired' });
+    if (error.name === "TokenExpiredError") {
+      return res.status(401).json({ error: "Token expired" });
     }
 
-    log.error('Authentication error', { error: error.message });
-    return res.status(500).json({ error: 'Authentication failed' });
+    log.error("Authentication error", { error: error.message });
+    return res.status(500).json({ error: "Authentication failed" });
   }
 }
 
@@ -91,11 +93,11 @@ export async function authenticate(req: Request, res: Response, next: NextFuncti
  */
 export function requireAdmin(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
-    return res.status(401).json({ error: 'Not authenticated' });
+    return res.status(401).json({ error: "Not authenticated" });
   }
 
-  if (req.user.role !== 'ADMIN' && req.user.role !== 'OWNER') {
-    return res.status(403).json({ error: 'Admin access required' });
+  if (req.user.role !== "ADMIN" && req.user.role !== "OWNER") {
+    return res.status(403).json({ error: "Admin access required" });
   }
 
   next();
@@ -106,11 +108,11 @@ export function requireAdmin(req: Request, res: Response, next: NextFunction) {
  */
 export function requireOwner(req: Request, res: Response, next: NextFunction) {
   if (!req.user) {
-    return res.status(401).json({ error: 'Not authenticated' });
+    return res.status(401).json({ error: "Not authenticated" });
   }
 
-  if (req.user.role !== 'OWNER') {
-    return res.status(403).json({ error: 'Owner access required' });
+  if (req.user.role !== "OWNER") {
+    return res.status(403).json({ error: "Owner access required" });
   }
 
   next();
@@ -119,16 +121,20 @@ export function requireOwner(req: Request, res: Response, next: NextFunction) {
 /**
  * Optional authentication - attach user if token provided but don't fail
  */
-export async function optionalAuth(req: Request, res: Response, next: NextFunction) {
+export async function optionalAuth(
+  req: Request,
+  res: Response,
+  next: NextFunction
+) {
   try {
     const authHeader = req.headers.authorization;
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return next();
     }
 
     const token = authHeader.substring(7);
-    const decoded = jwt.verify(token, JWT_SECRET) as {
+    const decoded = jwt.verify(token, env.JWT_SECRET) as {
       userId: string;
       tenantId: string;
       email: string;
@@ -140,7 +146,7 @@ export async function optionalAuth(req: Request, res: Response, next: NextFuncti
       include: { tenant: true },
     });
 
-    if (user && user.tenant.status === 'ACTIVE') {
+    if (user && user.tenant.status === "ACTIVE") {
       req.user = {
         userId: user.id,
         tenantId: user.tenantId,
