@@ -14,8 +14,27 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // Load environment variables
-// In production, dotenv looks in current directory, not dist/
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// Try multiple paths to find .env file
+const envPaths = [
+  path.resolve(__dirname, '../../.env'),  // For dist/server.js -> backend/.env
+  path.resolve(process.cwd(), '.env'),    // For CWD/.env
+  path.resolve(__dirname, '../.env'),     // Fallback
+];
+
+let envLoaded = false;
+for (const envPath of envPaths) {
+  const result = dotenv.config({ path: envPath });
+  if (!result.error) {
+    console.log(`✅ Loaded environment from: ${envPath}`);
+    envLoaded = true;
+    break;
+  }
+}
+
+if (!envLoaded) {
+  console.warn('⚠️  No .env file found. Using system environment variables.');
+  dotenv.config(); // Try default locations
+}
 
 // Import routes
 import webhookRoutes from './routes/webhook.js';
@@ -28,6 +47,18 @@ import analyticsRoutes from './routes/analytics.js';
 import healthRoutes from './routes/health.js';
 import mediaRoutes from './routes/media.js';
 import contactRoutes from './routes/contacts.js';
+
+// Validate required environment variables
+const requiredEnvVars = ['PORT', 'DATABASE_URL', 'JWT_SECRET', 'JWT_REFRESH_SECRET'];
+const missingEnvVars = requiredEnvVars.filter(varName => !process.env[varName]);
+
+if (missingEnvVars.length > 0) {
+  console.error('❌ Missing required environment variables:', missingEnvVars.join(', '));
+  console.error('💡 Make sure .env file exists or set these as system environment variables');
+  console.error(`📁 Current working directory: ${process.cwd()}`);
+  console.error(`📁 Script directory: ${__dirname}`);
+  process.exit(1);
+}
 
 const app: Express = express();
 const PORT = process.env.PORT;
