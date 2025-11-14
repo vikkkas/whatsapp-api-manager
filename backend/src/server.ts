@@ -30,7 +30,7 @@ import mediaRoutes from './routes/media.js';
 import contactRoutes from './routes/contacts.js';
 
 const app: Express = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT;
 
 // ============================================
 // SECURITY MIDDLEWARE
