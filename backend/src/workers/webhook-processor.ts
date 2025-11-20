@@ -1,10 +1,45 @@
 import { Worker, Job } from 'bullmq';
+import axios from 'axios';
 import { createRedisConnection } from '../config/redis.js';
 import prisma from '../config/prisma.js';
 import { resolveTenantFromPhoneNumberId } from '../utils/tenantHelpers.js';
 import { log } from '../utils/logger.js';
+import { normalizePhoneNumber } from '../utils/phone.js';
 
 const connection = createRedisConnection();
+const INTERNAL_API_BASE =
+  process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3000}`;
+
+async function notifyInternal(path: string, payload: Record<string, any>) {
+  if (!process.env.INTERNAL_API_TOKEN) {
+    return;
+  }
+
+  try {
+    await axios.post(`${INTERNAL_API_BASE}${path}`, payload, {
+      headers: {
+        'x-internal-token': process.env.INTERNAL_API_TOKEN,
+      },
+      timeout: 5000,
+    });
+  } catch (error: any) {
+    log.error('Failed to notify realtime event', {
+      error: error?.message || error,
+      path,
+    });
+  }
+}
+
+function notifyRealtimeNewMessage(conversationId: string, message: any) {
+  return notifyInternal('/api/internal/events/message', { conversationId, message });
+}
+
+function notifyConversationUpdate(conversation: any) {
+  return notifyInternal('/api/internal/events/conversation', {
+    conversationId: conversation.id,
+    conversation,
+  });
+}
 
 interface WebhookJob {
   rawEventId: string;
@@ -38,7 +73,29 @@ export const webhookWorker = new Worker<WebhookJob>(
       });
 
       const payload = rawEvent.payload as any;
+      const isTemplateUpdate =
+        payload.field === 'message_template_status_update' ||
+        payload.value?.event === 'template_status_update' ||
+        !!payload.value?.message_template_id;
+
+      if (isTemplateUpdate) {
+        const tenantId = await processTemplateStatusUpdate(payload.value);
+        await prisma.rawWebhookEvent.update({
+          where: { id: rawEventId },
+          data: {
+            tenantId: tenantId || rawEvent.tenantId,
+            status: 'PROCESSED',
+            processedAt: new Date(),
+          },
+        });
+        log.info('Template status update processed', { rawEventId });
+        return;
+      }
+
       const phoneNumberId = payload.value?.metadata?.phone_number_id;
+      const accountPhoneNumber = normalizePhoneNumber(
+        payload.value?.metadata?.display_phone_number
+      );
 
       if (!phoneNumberId) {
         throw new Error('No phone_number_id in webhook payload');
@@ -65,7 +122,11 @@ export const webhookWorker = new Worker<WebhookJob>(
       const statuses = payload.value?.statuses || [];
 
       for (const message of messages) {
-        await processInboundMessage(message, tenantId, phoneNumberId);
+        await processInboundMessage(
+          message,
+          tenantId,
+          accountPhoneNumber || normalizePhoneNumber(phoneNumberId) || phoneNumberId
+        );
       }
 
       for (const status of statuses) {
@@ -119,13 +180,17 @@ export const webhookWorker = new Worker<WebhookJob>(
 async function processInboundMessage(
   messageData: any,
   tenantId: string,
-  phoneNumberId: string
+  accountPhone: string
 ) {
   const waMessageId = messageData.id;
-  const from = messageData.from;
+  const normalizedFrom = normalizePhoneNumber(messageData.from);
+  if (!normalizedFrom) {
+    log.warn('Unable to normalize sender number', { from: messageData.from });
+    return;
+  }
   const timestamp = new Date(parseInt(messageData.timestamp) * 1000);
 
-  log.info('Processing inbound message', { waMessageId, from });
+  log.info('Processing inbound message', { waMessageId, from: normalizedFrom });
 
   // Check for duplicate (idempotency)
   const existing = await prisma.message.findUnique({
@@ -138,25 +203,57 @@ async function processInboundMessage(
   }
 
   // Get or create conversation
-  const conversation = await prisma.conversation.upsert({
+  const profileName = messageData.profile?.name?.trim();
+
+  const contact = await prisma.contact.upsert({
     where: {
-      tenantId_contactPhone: {
+      tenantId_phoneNumber: {
         tenantId,
-        contactPhone: from,
+        phoneNumber: normalizedFrom,
       },
     },
     create: {
       tenantId,
-      contactPhone: from,
-      contactName: messageData.profile?.name || from,
+      phoneNumber: normalizedFrom,
+      name: profileName || normalizedFrom,
+    },
+    update: profileName ? { name: profileName } : {},
+  });
+
+  let conversation = await prisma.conversation.upsert({
+    where: {
+      tenantId_contactPhone: {
+        tenantId,
+        contactPhone: normalizedFrom,
+      },
+    },
+    create: {
+      tenantId,
+      contactId: contact.id,
+      contactPhone: normalizedFrom,
+      contactName: profileName || contact.name,
       status: 'OPEN',
       lastMessageAt: timestamp,
     },
     update: {
+      contactId: contact.id,
+      ...(profileName ? { contactName: profileName } : {}),
       lastMessageAt: timestamp,
       unreadCount: { increment: 1 },
     },
   });
+
+  if (profileName && conversation.contactName !== profileName) {
+    conversation = await prisma.conversation.update({
+      where: { id: conversation.id },
+      data: { contactName: profileName },
+    });
+    await prisma.contact.update({
+      where: { id: contact.id },
+      data: { name: profileName },
+    });
+    await notifyConversationUpdate(conversation);
+  }
 
   // Determine message type and content
   let messageType: string = 'TEXT';
@@ -204,15 +301,15 @@ async function processInboundMessage(
   }
 
   // Create message
-  await prisma.message.create({
+  const savedMessage = await prisma.message.create({
     data: {
       tenantId,
       conversationId: conversation.id,
       waMessageId,
       direction: 'INBOUND',
       status: 'DELIVERED',
-      from,
-      to: phoneNumberId,
+      from: normalizedFrom,
+      to: accountPhone || '',
       type: messageType as any,
       text,
       mediaType,
@@ -223,6 +320,8 @@ async function processInboundMessage(
       deliveredAt: timestamp,
     },
   });
+
+  await notifyRealtimeNewMessage(conversation.id, savedMessage);
 
   log.info('Inbound message saved', { waMessageId, conversationId: conversation.id });
 }
@@ -273,6 +372,62 @@ async function processMessageStatus(statusData: any, tenantId: string) {
   });
 
   log.info('Message status updated', { waMessageId, status: updateData.status });
+}
+
+async function processTemplateStatusUpdate(value: any) {
+  const templateId = value?.message_template_id;
+  const templateName = value?.message_template_name;
+  const language = value?.language;
+  const status = (value?.status || value?.event || '').toString().toUpperCase();
+  const reason = value?.reason || value?.rejection_reason || null;
+
+  let template = null;
+
+  if (templateId) {
+    template = await prisma.template.findFirst({
+      where: { metaTemplateId: templateId },
+    });
+  }
+
+  if (!template && templateName && language) {
+    template = await prisma.template.findFirst({
+      where: {
+        name: templateName,
+        language,
+      },
+    });
+  }
+
+  if (!template) {
+    log.warn('Template status update received for unknown template', {
+      templateId,
+      templateName,
+    });
+    return null;
+  }
+
+  const statusMap: Record<string, any> = {
+    APPROVED: 'APPROVED',
+    REJECTED: 'REJECTED',
+    DISABLED: 'DISABLED',
+    PENDING: 'PENDING',
+  };
+
+  await prisma.template.update({
+    where: { id: template.id },
+    data: {
+      status: statusMap[status] || template.status,
+      rejectionReason: reason,
+      metaTemplateId: templateId || template.metaTemplateId,
+    },
+  });
+
+  log.info('Template status updated from webhook', {
+    templateId: template.id,
+    status: statusMap[status] || template.status,
+  });
+
+  return template.tenantId;
 }
 
 // Worker event listeners

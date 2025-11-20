@@ -50,15 +50,18 @@ router.get('/', async (req: Request, res: Response) => {
         id: true,
         name: true,
         slug: true,
+        webhookUrl: true,
+        webhookVerifyToken: true,
+        webhookVerifiedAt: true,
       }
     });
 
-    // Construct webhook URL based on environment
-    const webhookUrl = process.env.WEBHOOK_BASE_URL 
+    // Construct webhook URL based on environment with tenant overrides
+    const webhookUrl = tenant?.webhookUrl || (process.env.WEBHOOK_BASE_URL 
       ? `${process.env.WEBHOOK_BASE_URL}/api/webhook`
-      : `http://localhost:3000/api/webhook`;
+      : `http://localhost:3000/api/webhook`);
 
-    const webhookVerifyToken = process.env.WEBHOOK_VERIFY_TOKEN || 'your-verify-token';
+    const webhookVerifyToken = tenant?.webhookVerifyToken || process.env.WEBHOOK_VERIFY_TOKEN || 'your-verify-token';
 
     res.json({
       success: true,
@@ -78,6 +81,7 @@ router.get('/', async (req: Request, res: Response) => {
         webhook: {
           url: webhookUrl,
           verifyToken: webhookVerifyToken,
+          verifiedAt: tenant?.webhookVerifiedAt,
           subscribedEvents: [
             'messages',
             'message_status',
@@ -116,104 +120,161 @@ router.patch('/', async (req: Request, res: Response) => {
       });
     }
 
-    const { phoneNumberId, accessToken, businessAccountId, phoneNumber, displayName } = req.body;
+    const wabaPayload = req.body?.waba 
+      ?? ((req.body?.phoneNumberId || req.body?.accessToken || req.body?.businessAccountId) ? req.body : null);
+    const webhookPayload = req.body?.webhook ?? {};
+    const incomingWebhookUrl = typeof webhookPayload.url === 'string' ? webhookPayload.url : req.body?.webhookUrl;
+    const incomingWebhookVerifyToken = typeof webhookPayload.verifyToken === 'string'
+      ? webhookPayload.verifyToken
+      : req.body?.webhookVerifyToken;
+    const existingTenant = await prisma.tenant.findUnique({
+      where: { id: tenantId },
+      select: {
+        webhookUrl: true,
+        webhookVerifyToken: true,
+        webhookVerifiedAt: true,
+      },
+    });
 
-    // Validate required fields
-    if (!phoneNumberId || !accessToken) {
-      return res.status(400).json({
-        success: false,
-        message: 'Phone Number ID and Access Token are required'
-      });
-    }
-
-    // Validate credentials by calling Meta Graph API
-    let isValid = true;
-    let qualityRating = null;
-    let messagingLimit = null;
-    let actualPhoneNumber = phoneNumber;
-    let actualDisplayName = displayName;
-    let invalidReason = null;
-
-    try {
-      const response = await axios.get(
-        `https://graph.facebook.com/v18.0/${phoneNumberId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`
-          },
-          params: {
-            fields: 'verified_name,display_phone_number,quality_rating,messaging_limit_tier'
-          }
-        }
-      );
-
-      if (response.data) {
-        actualPhoneNumber = response.data.display_phone_number || phoneNumber;
-        actualDisplayName = response.data.verified_name || displayName;
-        qualityRating = response.data.quality_rating || 'UNKNOWN';
-        messagingLimit = response.data.messaging_limit_tier || 'UNKNOWN';
-      }
-    } catch (error: any) {
-      isValid = false;
-      invalidReason = error.response?.data?.error?.message || 'Failed to validate credentials with Meta API';
-      console.error('Meta API validation error:', error.response?.data || error.message);
-      
-      // Return error if validation fails
-      return res.status(400).json({
-        success: false,
-        message: 'Invalid WABA credentials',
-        error: invalidReason
-      });
-    }
-
-    // Check if credential already exists
     const existingCredential = await prisma.wABACredential.findFirst({
       where: { tenantId }
     });
 
-    let credential;
+    let credential = existingCredential ?? null;
 
-    if (existingCredential) {
-      // Update existing credential
-      credential = await prisma.wABACredential.update({
-        where: { id: existingCredential.id },
-        data: {
-          phoneNumberId,
-          phoneNumber: actualPhoneNumber,
-          displayName: actualDisplayName,
-          accessToken, // TODO: Encrypt in production
-          businessAccountId,
-          isValid,
-          lastValidatedAt: new Date(),
-          invalidReason,
-          qualityRating,
-          messagingLimit,
+    if (wabaPayload) {
+      const { phoneNumberId, accessToken, businessAccountId, phoneNumber, displayName } = wabaPayload;
+
+      const resolvedPhoneNumberId = phoneNumberId || existingCredential?.phoneNumberId;
+      const resolvedAccessToken = accessToken || existingCredential?.accessToken;
+      const resolvedBusinessAccountId = businessAccountId ?? existingCredential?.businessAccountId ?? null;
+
+      // Validate required fields when updating WABA credentials
+      if (!resolvedPhoneNumberId || !resolvedAccessToken) {
+        return res.status(400).json({
+          success: false,
+          message: 'Phone Number ID and Access Token are required'
+        });
+      }
+
+      // Validate credentials by calling Meta Graph API
+      let isValid = true;
+      let qualityRating = null;
+      let messagingLimit = null;
+      let actualPhoneNumber = phoneNumber || existingCredential?.phoneNumber || null;
+      let actualDisplayName = displayName || existingCredential?.displayName || null;
+      let invalidReason = null;
+
+      try {
+        const response = await axios.get(
+          `https://graph.facebook.com/v18.0/${resolvedPhoneNumberId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${resolvedAccessToken}`
+            },
+            params: {
+              fields: 'verified_name,display_phone_number,quality_rating,messaging_limit_tier'
+            }
+          }
+        );
+
+        if (response.data) {
+          actualPhoneNumber = response.data.display_phone_number || phoneNumber || actualPhoneNumber;
+          actualDisplayName = response.data.verified_name || displayName || actualDisplayName;
+          qualityRating = response.data.quality_rating || 'UNKNOWN';
+          messagingLimit = response.data.messaging_limit_tier || 'UNKNOWN';
         }
-      });
-    } else {
-      // Create new credential
-      credential = await prisma.wABACredential.create({
-        data: {
-          tenantId,
-          phoneNumberId,
-          phoneNumber: actualPhoneNumber,
-          displayName: actualDisplayName,
-          accessToken, // TODO: Encrypt in production
-          businessAccountId,
-          isValid,
-          lastValidatedAt: new Date(),
-          invalidReason,
-          qualityRating,
-          messagingLimit,
-        }
-      });
+      } catch (error: any) {
+        isValid = false;
+        invalidReason = error.response?.data?.error?.message || 'Failed to validate credentials with Meta API';
+        console.error('Meta API validation error:', error.response?.data || error.message);
+        
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid WABA credentials',
+          error: invalidReason
+        });
+      }
+
+      if (existingCredential) {
+        credential = await prisma.wABACredential.update({
+          where: { id: existingCredential.id },
+          data: {
+            phoneNumberId: resolvedPhoneNumberId,
+            phoneNumber: actualPhoneNumber,
+            displayName: actualDisplayName,
+            accessToken: resolvedAccessToken, // TODO: Encrypt in production
+            businessAccountId: resolvedBusinessAccountId,
+            isValid,
+            lastValidatedAt: new Date(),
+            invalidReason,
+            qualityRating,
+            messagingLimit,
+          }
+        });
+      } else {
+        credential = await prisma.wABACredential.create({
+          data: {
+            tenantId,
+            phoneNumberId: resolvedPhoneNumberId,
+            phoneNumber: actualPhoneNumber,
+            displayName: actualDisplayName,
+            accessToken: resolvedAccessToken, // TODO: Encrypt in production
+            businessAccountId: resolvedBusinessAccountId,
+            isValid,
+            lastValidatedAt: new Date(),
+            invalidReason,
+            qualityRating,
+            messagingLimit,
+          }
+        });
+      }
     }
+
+    const tenantUpdates: Record<string, string | Date | null> = {};
+    if (typeof incomingWebhookUrl === 'string' && incomingWebhookUrl.trim().length > 0) {
+      tenantUpdates.webhookUrl = incomingWebhookUrl.trim();
+    }
+
+    if (typeof incomingWebhookVerifyToken === 'string' && incomingWebhookVerifyToken.trim().length > 0) {
+      tenantUpdates.webhookVerifyToken = incomingWebhookVerifyToken.trim();
+      tenantUpdates.webhookVerifiedAt = null;
+    }
+
+    const tenant = Object.keys(tenantUpdates).length > 0
+      ? await prisma.tenant.update({
+          where: { id: tenantId },
+          data: tenantUpdates,
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            webhookUrl: true,
+            webhookVerifyToken: true,
+          }
+        })
+      : await prisma.tenant.findUnique({
+          where: { id: tenantId },
+          select: {
+            id: true,
+            name: true,
+            slug: true,
+            webhookUrl: true,
+            webhookVerifyToken: true,
+          }
+        });
+
+    const resolvedWebhookUrl = tenant?.webhookUrl || (process.env.WEBHOOK_BASE_URL 
+      ? `${process.env.WEBHOOK_BASE_URL}/api/webhook`
+      : `http://localhost:3000/api/webhook`);
+
+    const resolvedWebhookVerifyToken = tenant?.webhookVerifyToken || process.env.WEBHOOK_VERIFY_TOKEN || 'your-verify-token';
 
     res.json({
       success: true,
       message: 'Settings updated successfully',
       settings: {
-        waba: {
+        waba: credential ? {
           phoneNumberId: credential.phoneNumberId,
           phoneNumber: credential.phoneNumber,
           displayName: credential.displayName,
@@ -224,7 +285,17 @@ router.patch('/', async (req: Request, res: Response) => {
           invalidReason: credential.invalidReason,
           qualityRating: credential.qualityRating,
           messagingLimit: credential.messagingLimit,
-        }
+        } : null,
+        webhook: {
+          url: resolvedWebhookUrl,
+          verifyToken: resolvedWebhookVerifyToken,
+          verifiedAt: tenant?.webhookVerifiedAt || existingTenant?.webhookVerifiedAt || null,
+        },
+        tenant: tenant ? {
+          id: tenant.id,
+          name: tenant.name,
+          slug: tenant.slug,
+        } : null,
       }
     });
   } catch (error) {

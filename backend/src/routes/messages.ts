@@ -4,6 +4,7 @@ import prisma from '../config/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { enforceTenantIsolation } from '../middleware/tenant.js';
 import { log } from '../utils/logger.js';
+import { normalizePhoneNumber } from '../utils/phone.js';
 import { getTenantRateLimiter } from '../utils/rateLimiter.js';
 import { broadcastNewMessage } from '../services/websocket.js';
 import { getMetaAPIForTenant } from '../services/metaAPI.js';
@@ -18,12 +19,37 @@ router.use(enforceTenantIsolation);
 const sendMessageSchema = z.object({
   phoneNumberId: z.string(),
   to: z.string(),
-  type: z.enum(['text', 'image', 'video', 'audio', 'document']),
+  type: z.enum(['text', 'image', 'video', 'audio', 'document', 'template']),
   text: z.string().optional(),
   mediaUrl: z.string().url().optional(),
   caption: z.string().optional(),
   filename: z.string().optional(),
+  templateName: z.string().optional(),
+  languageCode: z.string().optional(),
+  templateComponents: z.array(z.any()).optional(),
 });
+
+const renderTemplateBody = (bodyText?: string | null, components?: Array<any>) => {
+  if (!bodyText) return null;
+  if (!components || components.length === 0) return bodyText;
+
+  const bodyComponent = components.find(
+    (component) => (component.type || '').toLowerCase() === 'body'
+  );
+
+  if (!bodyComponent?.parameters) {
+    return bodyText;
+  }
+
+  let rendered = bodyText;
+  bodyComponent.parameters.forEach((param: any, index: number) => {
+    const value = typeof param.text === 'string' ? param.text : '';
+    const placeholder = new RegExp(`\\{\\{${index + 1}\\}\\}`, 'g');
+    rendered = rendered.replace(placeholder, value);
+  });
+
+  return rendered;
+};
 
 const listMessagesSchema = z.object({
   conversationId: z.string().optional(),
@@ -161,11 +187,33 @@ router.post('/', async (req: Request, res: Response) => {
       });
     }
 
-    // Find or create conversation
+    const normalizedRecipient = normalizePhoneNumber(data.to);
+    if (!normalizedRecipient) {
+      return res.status(400).json({ error: 'Invalid destination phone number' });
+    }
+    const metaRecipient = normalizedRecipient.startsWith('+')
+      ? normalizedRecipient.slice(1)
+      : normalizedRecipient;
+
+    const contact = await prisma.contact.upsert({
+      where: {
+        tenantId_phoneNumber: {
+          tenantId,
+          phoneNumber: normalizedRecipient,
+        },
+      },
+      create: {
+        tenantId,
+        phoneNumber: normalizedRecipient,
+        name: normalizedRecipient,
+      },
+      update: {},
+    });
+
     let conversation = await prisma.conversation.findFirst({
       where: {
         tenantId,
-        contactPhone: data.to,
+        contactPhone: normalizedRecipient,
       },
     });
 
@@ -173,12 +221,36 @@ router.post('/', async (req: Request, res: Response) => {
       conversation = await prisma.conversation.create({
         data: {
           tenantId,
-          contactPhone: data.to,
-          contactName: data.to,
+          contactId: contact.id,
+          contactPhone: normalizedRecipient,
+          contactName: contact.name,
           status: 'OPEN',
         },
       });
+    } else if (!conversation.contactId) {
+      conversation = await prisma.conversation.update({
+        where: { id: conversation.id },
+        data: {
+          contactId: contact.id,
+          contactPhone: normalizedRecipient,
+          contactName: conversation.contactName || contact.name,
+        },
+      });
     }
+
+    const templateData =
+      data.type === 'template'
+        ? await prisma.template.findFirst({
+            where: {
+              tenantId,
+              OR: [
+                { id: data.templateName },
+                { name: data.templateName },
+                { displayName: data.templateName },
+              ],
+            },
+          })
+        : null;
 
     // Use Meta API service to send message
     const metaAPI = await getMetaAPIForTenant(tenantId);
@@ -186,8 +258,34 @@ router.post('/', async (req: Request, res: Response) => {
 
     try {
       if (data.type === 'text' && data.text) {
-        const result = await metaAPI.sendTextMessage(data.to, data.text, { preview_url: true });
+        const result = await metaAPI.sendTextMessage(metaRecipient, data.text, { preview_url: true });
         waMessageId = result.messageId;
+      } else if (data.type === 'template') {
+        const templateName = templateData?.name || data.templateName;
+        const languageCode = data.languageCode || templateData?.language;
+
+        if (!templateName || !languageCode) {
+          throw new Error('Template name and language code are required for template messages');
+        }
+
+        const componentsForSend =
+          data.templateComponents !== undefined ? data.templateComponents : undefined;
+
+        const renderedBody = renderTemplateBody(templateData?.bodyText, componentsForSend);
+
+        const result = await metaAPI.sendTemplate(
+          metaRecipient,
+          templateName,
+          languageCode,
+          componentsForSend && componentsForSend.length > 0 ? componentsForSend : undefined
+        );
+        waMessageId = result.messageId;
+
+        data.text = renderedBody || templateData?.bodyText || data.text || null;
+        data.templateName = templateName;
+        if (languageCode) {
+          data.languageCode = languageCode;
+        }
       } else if (data.mediaUrl) {
         // For media messages, you'd typically upload the media first to get a mediaId
         // For now, we'll use the URL directly (requires link parameter in sendMediaMessage)
@@ -197,13 +295,27 @@ router.post('/', async (req: Request, res: Response) => {
         throw new Error('Invalid message type or missing content');
       }
     } catch (apiError: any) {
+      const details =
+        apiError.response?.data?.error?.message ||
+        apiError.response?.data?.message ||
+        apiError.message;
+
       log.error('WhatsApp API error', {
-        error: apiError.message,
+        error: details,
         tenantId,
         to: data.to,
+        status: apiError.response?.status,
       });
-      throw new Error(`Failed to send message via WhatsApp: ${apiError.message}`);
+
+      return res.status(502).json({
+        error: details || 'Failed to send message via WhatsApp',
+      });
     }
+
+    const templateParams =
+      data.type === 'template' && data.templateComponents && data.templateComponents.length > 0
+        ? data.templateComponents
+        : null;
 
     // Save message to database
     const message = await prisma.message.create({
@@ -213,13 +325,18 @@ router.post('/', async (req: Request, res: Response) => {
         waMessageId,
         direction: 'OUTBOUND',
         from: credential.phoneNumber,
-        to: data.to,
+        to: normalizedRecipient,
         type: data.type.toUpperCase() as any,
-        text: data.text,
+        text: data.type === 'template' ? (data.text || null) : data.text,
         mediaUrl: data.mediaUrl,
         mediaCaption: data.caption,
         mediaFilename: data.filename,
         status: 'SENT',
+        templateName:
+          data.type === 'template'
+            ? templateData?.displayName || templateData?.name || data.templateName || null
+            : null,
+        templateParams: templateParams,
       },
     });
 

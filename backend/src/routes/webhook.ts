@@ -11,19 +11,45 @@ const router = Router();
  * GET /api/webhook
  * Webhook verification endpoint for Meta
  */
-router.get('/', (req: Request, res: Response) => {
-  const mode = req.query['hub.mode'];
-  const token = req.query['hub.verify_token'];
-  const challenge = req.query['hub.challenge'];
+router.get('/', async (req: Request, res: Response) => {
+  const mode = Array.isArray(req.query['hub.mode']) ? req.query['hub.mode'][0] : req.query['hub.mode'];
+  const token = Array.isArray(req.query['hub.verify_token']) ? req.query['hub.verify_token'][0] : req.query['hub.verify_token'];
+  const challenge = Array.isArray(req.query['hub.challenge']) ? req.query['hub.challenge'][0] : req.query['hub.challenge'];
 
   log.info('Webhook verification attempt', { mode });
 
-  if (mode === 'subscribe' && token === process.env.WEBHOOK_VERIFY_TOKEN) {
-    log.info('✅ Webhook verified successfully');
-    res.status(200).send(challenge);
-  } else {
-    log.error('❌ Webhook verification failed - invalid token');
-    res.sendStatus(403);
+  if (mode !== 'subscribe' || typeof token !== 'string' || !challenge) {
+    log.error('❌ Webhook verification failed - invalid params');
+    return res.sendStatus(403);
+  }
+
+  try {
+    const tenant = await prisma.tenant.findFirst({
+      where: {
+        webhookVerifyToken: token,
+      },
+      select: { id: true },
+    });
+
+    if (tenant) {
+      await prisma.tenant.update({
+        where: { id: tenant.id },
+        data: { webhookVerifiedAt: new Date() },
+      });
+      log.info('✅ Webhook verified successfully for tenant', { tenantId: tenant.id });
+      return res.status(200).send(challenge);
+    }
+
+    if (process.env.WEBHOOK_VERIFY_TOKEN && token === process.env.WEBHOOK_VERIFY_TOKEN) {
+      log.info('✅ Webhook verified using default token');
+      return res.status(200).send(challenge);
+    }
+
+    log.error('❌ Webhook verification failed - token mismatch');
+    return res.sendStatus(403);
+  } catch (error) {
+    log.error('❌ Webhook verification error', { error });
+    return res.sendStatus(500);
   }
 });
 
@@ -35,9 +61,23 @@ router.get('/', (req: Request, res: Response) => {
 router.post('/', async (req: Request, res: Response) => {
   try {
     // Parse body (it's raw from middleware)
-    const body = typeof req.body === 'string' 
-      ? JSON.parse(req.body) 
-      : req.body;
+    let body: any = req.body;
+
+    if (Buffer.isBuffer(req.body)) {
+      try {
+        body = JSON.parse(req.body.toString('utf8'));
+      } catch (error) {
+        log.error('Invalid webhook payload buffer', { error });
+        return res.sendStatus(400);
+      }
+    } else if (typeof req.body === 'string') {
+      try {
+        body = JSON.parse(req.body);
+      } catch (error) {
+        log.error('Invalid webhook payload string', { error });
+        return res.sendStatus(400);
+      }
+    }
 
     log.info('📨 Webhook received', { 
       object: body.object,
@@ -60,21 +100,27 @@ router.post('/', async (req: Request, res: Response) => {
     // This ensures we never lose data even if processing fails
     const promises = body.entry?.map(async (entry: any) => {
       for (const change of entry.changes || []) {
-        // Extract phone number ID from the webhook
+        const isTemplateUpdate =
+          change.field === 'message_template_status_update' ||
+          !!change.value?.message_template_id;
+
         const phoneNumberId = change.value?.metadata?.phone_number_id;
-        
-        if (!phoneNumberId) {
+
+        if (!phoneNumberId && !isTemplateUpdate) {
           log.warn('No phone_number_id in webhook change');
           continue;
         }
 
         // Resolve tenant (optional at this stage)
-        const tenant = await resolveTenantFromPhoneNumberId(phoneNumberId);
+        let tenant = null;
+        if (phoneNumberId) {
+          tenant = await resolveTenantFromPhoneNumberId(phoneNumberId);
+        }
         
         // Save raw webhook event
         const rawEvent = await prisma.rawWebhookEvent.create({
           data: {
-            phoneNumberId,
+            phoneNumberId: phoneNumberId || null,
             tenantId: tenant?.id || null,
             payload: change,
             status: 'PENDING',

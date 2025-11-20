@@ -24,6 +24,7 @@ import analyticsRoutes from './routes/analytics.js';
 import healthRoutes from './routes/health.js';
 import mediaRoutes from './routes/media.js';
 import contactRoutes from './routes/contacts.js';
+import internalRoutes from './routes/internal.js';
 
 const app: Express = express();
 const PORT = env.PORT;
@@ -106,6 +107,7 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/contacts', contactRoutes);
+app.use('/api/internal', internalRoutes);
 
 // ============================================
 // ROOT ENDPOINT

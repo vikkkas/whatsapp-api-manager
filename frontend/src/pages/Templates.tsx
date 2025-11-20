@@ -30,7 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { templateAPI, messageAPI, type Template } from "@/lib/api";
+import { templateAPI, templateMessageAPI, settingsAPI, type Template } from "@/lib/api";
 import { toast } from "sonner";
 import { formatPhoneNumberDisplay, normalizePhoneNumber } from "@/lib/phoneUtils";
 
@@ -54,6 +54,7 @@ export default function Templates() {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
   const [sendToPhone, setSendToPhone] = useState("");
   const [sendingMessage, setSendingMessage] = useState(false);
+  const [phoneNumberId, setPhoneNumberId] = useState("");
 
   // Form state for create/edit
   const [templateName, setTemplateName] = useState("");
@@ -170,13 +171,17 @@ export default function Templates() {
       setSendingMessage(true);
       const normalizedPhone = normalizePhoneNumber(sendToPhone);
       
-      // Use the new WhatsApp template API
-      await messageAPI.sendTemplate(
-        normalizedPhone, 
-        selectedTemplate.name, 
-        selectedTemplate.language || 'en_US',
-        [] // No parameters for now
-      );
+      if (!phoneNumberId) {
+        throw new Error("Configure your WhatsApp phone number in Settings first.");
+      }
+
+      await templateMessageAPI.send({
+        phoneNumberId,
+        to: normalizedPhone,
+        templateName: selectedTemplate.name,
+        languageCode: selectedTemplate.language || 'en_US',
+        templateComponents: [],
+      });
       
       toast.success(`Template "${selectedTemplate.name}" sent successfully!`);
       setSendDialogOpen(false);
@@ -520,3 +525,14 @@ export default function Templates() {
     </div>
   );
 }
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await settingsAPI.get();
+        setPhoneNumberId(response.settings?.waba?.phoneNumberId || "");
+      } catch (error) {
+        console.error("Failed to load settings", error);
+      }
+    };
+    fetchSettings();
+  }, []);

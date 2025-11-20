@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { conversationAPI, messageAPI, type Conversation } from '../lib/api';
+import { conversationAPI, messageAPI, settingsAPI, type Conversation } from '../lib/api';
 import { useConversationStore } from '../store/conversationStore';
 import { useMessageStore } from '../store/messageStore';
 import { useWebSocket } from '../contexts/WebSocketContext';
-import { Card } from './ui/card';
 import { Input } from './ui/input';
 import { Button } from './ui/button';
 import { Avatar, AvatarFallback } from './ui/avatar';
@@ -22,9 +21,11 @@ import {
   Image as ImageIcon,
   Video,
   File,
-  MessageSquare
+  MessageSquare,
+  Edit3,
+  X
 } from 'lucide-react';
-import { formatDistanceToNow, format, isSameDay } from 'date-fns';
+import { format, isSameDay } from 'date-fns';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -42,12 +43,16 @@ export function MessageThread({ conversationId, onBack }: Props) {
   const [conversation, setConversation] = useState<Conversation | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [phoneNumberId, setPhoneNumberId] = useState('');
+  const [isEditingName, setIsEditingName] = useState(false);
+  const [contactNameInput, setContactNameInput] = useState('');
+  const [updatingName, setUpdatingName] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  const { messagesByConversation, isSending, setMessages, setSending } = useMessageStore();
-  const { typingUsers, resetUnreadCount } = useConversationStore();
+  const { messagesByConversation, isSending, setMessages, setSending, addMessage } = useMessageStore();
+  const { typingUsers, resetUnreadCount, updateConversation: updateConversationStore } = useConversationStore();
   const { joinConversation, leaveConversation, startTyping, stopTyping, isConnected } = useWebSocket();
 
   const messages = messagesByConversation.get(conversationId) || [];
@@ -85,13 +90,30 @@ export function MessageThread({ conversationId, onBack }: Props) {
     };
   }, [conversationId, joinConversation, leaveConversation, loadConversation, stopTyping]);
 
+  useEffect(() => {
+    setContactNameInput(conversation?.contactName || '');
+  }, [conversation?.contactName]);
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await settingsAPI.get();
+        setPhoneNumberId(response.settings?.waba?.phoneNumberId || '');
+      } catch (error) {
+        console.error('Failed to load settings', error);
+      }
+    };
+
+    fetchSettings();
+  }, []);
+
   // Auto-scroll to bottom
   useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
+    scrollToBottom('auto');
+  }, [conversationId]);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
+    messagesEndRef.current?.scrollIntoView({ behavior });
   };
 
   const handleTyping = () => {
@@ -113,13 +135,17 @@ export function MessageThread({ conversationId, onBack }: Props) {
     e.preventDefault();
     
     if (!newMessage.trim() || !conversation || isSending) return;
+    if (!phoneNumberId) {
+      toast.error('Configure your WhatsApp number in Settings first.');
+      return;
+    }
 
     setSending(true);
     stopTyping(conversationId);
 
     try {
-      await messageAPI.send({
-        phoneNumberId: '1234567890', // TODO: Get from settings/WABA credentials
+      const sentMessage = await messageAPI.send({
+        phoneNumberId,
         to: conversation.contactPhone,
         type: 'text',
         text: newMessage,
@@ -127,9 +153,16 @@ export function MessageThread({ conversationId, onBack }: Props) {
 
       setNewMessage('');
       inputRef.current?.focus();
-      
-      // Reload conversation to get the new message
-      setTimeout(() => loadConversation(), 500);
+      addMessage(conversationId, sentMessage);
+      setConversation((prev) =>
+        prev
+          ? {
+              ...prev,
+              lastMessageAt: sentMessage.createdAt,
+              messages: prev.messages ? [...prev.messages, sentMessage] : [sentMessage],
+            }
+          : prev
+      );
     } catch (err: unknown) {
       const error = err as Error;
       console.error('Failed to send message:', error);
@@ -163,6 +196,30 @@ export function MessageThread({ conversationId, onBack }: Props) {
       loadConversation();
     } catch (error) {
       toast.error('Failed to resolve conversation');
+    }
+  };
+
+  const handleUpdateContactName = async () => {
+    if (!conversation) return;
+    if (!contactNameInput.trim()) {
+      toast.error('Contact name cannot be empty');
+      return;
+    }
+
+    setUpdatingName(true);
+    try {
+      const updated = await conversationAPI.update(conversationId, {
+        contactName: contactNameInput.trim(),
+      });
+      setConversation((prev) => (prev ? { ...prev, contactName: updated.contactName } : prev));
+      updateConversationStore(conversationId, { contactName: updated.contactName });
+      toast.success('Contact name updated');
+      setIsEditingName(false);
+    } catch (error) {
+      toast.error('Failed to update contact name');
+      setContactNameInput(conversation.contactName || '');
+    } finally {
+      setUpdatingName(false);
     }
   };
 
@@ -245,6 +302,38 @@ export function MessageThread({ conversationId, onBack }: Props) {
     }
   };
 
+  const renderTemplateMessage = (message: any) => {
+    const params = Array.isArray(message.templateParams) ? message.templateParams : [];
+    const bodyParams =
+      params.find((component) => (component.type || '').toLowerCase() === 'body')
+        ?.parameters || [];
+
+    return (
+      <div className="space-y-2">
+        <div className="text-[11px] uppercase tracking-wider font-semibold opacity-70">
+          Template • {message.templateName || 'WhatsApp Template'}
+        </div>
+        {message.text ? (
+          <p className="whitespace-pre-wrap break-words leading-relaxed">{message.text}</p>
+        ) : (
+          <p className="text-sm italic opacity-75">Template sent</p>
+        )}
+        {bodyParams.length > 0 && (
+          <div className="rounded-md border border-white/20 bg-white/10 p-2 text-xs">
+            {bodyParams.map((param: any, index: number) => (
+              <div key={index} className="flex justify-between gap-4">
+                <span className="text-gray-500">Variable {index + 1}</span>
+                <span className="font-medium text-gray-900 dark:text-white">
+                  {param.text || '-'}
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  };
+
   const renderMessage = (message: any, index: number) => {
     const isOutbound = message.direction === 'OUTBOUND';
     const prevMessage = messages[index - 1];
@@ -255,7 +344,7 @@ export function MessageThread({ conversationId, onBack }: Props) {
       <div key={message.id}>
         {showDateDivider && (
           <div className="flex justify-center my-6">
-            <Badge variant="secondary" className="bg-white shadow-sm px-3 py-1 text-xs font-medium">
+            <Badge variant="secondary" className="bg-white text-slate-600 shadow-sm px-3 py-1 text-xs font-medium">
               {format(new Date(message.createdAt), 'MMMM d, yyyy')}
             </Badge>
           </div>
@@ -265,29 +354,34 @@ export function MessageThread({ conversationId, onBack }: Props) {
           <div 
             className={`max-w-[75%] sm:max-w-[65%] ${isOutbound ? 'ml-auto' : 'mr-auto'}`}
           >
+            {!isOutbound && (
+              <p className="text-xs font-medium text-gray-500 mb-1">
+                {conversation.contactName || message.from}
+              </p>
+            )}
             <div 
               className={`
                 relative px-4 py-2 rounded-2xl shadow-sm
                 ${isOutbound 
-                  ? 'bg-blue-500 text-white rounded-br-md' 
-                  : 'bg-white text-gray-900 rounded-bl-md border border-gray-200'
+                  ? 'bg-[#e4e0ff] text-slate-900 rounded-br-md border border-[#d5cffb]'
+                  : 'bg-white text-slate-900 rounded-bl-md border border-gray-200'
                 }
                 ${showTail && isOutbound ? 'rounded-br-sm' : ''}
                 ${showTail && !isOutbound ? 'rounded-bl-sm' : ''}
               `}
             >
               {/* Message content */}
-              {message.type === 'TEXT' ? (
+              {message.type === 'TEXT' && (
                 <p className="whitespace-pre-wrap break-words leading-relaxed">
                   {message.text}
                 </p>
-              ) : (
-                renderMediaPreview(message)
               )}
+              {message.type === 'TEMPLATE' && renderTemplateMessage(message)}
+              {message.type !== 'TEXT' && message.type !== 'TEMPLATE' && renderMediaPreview(message)}
 
               {/* Timestamp and status */}
               <div className={`flex items-center justify-end gap-1 mt-1 ${
-                isOutbound ? 'text-blue-100' : 'text-gray-500'
+                isOutbound ? 'text-[#6d5ae0]' : 'text-slate-500'
               }`}>
                 <span className="text-[10px] font-medium">
                   {format(new Date(message.createdAt), 'HH:mm')}
@@ -307,43 +401,82 @@ export function MessageThread({ conversationId, onBack }: Props) {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-gradient-to-br from-gray-50 to-gray-100">
-        <Loader2 className="h-10 w-10 animate-spin text-blue-500 mb-4" />
-        <p className="text-gray-600 font-medium">Loading conversation...</p>
+      <div className="flex flex-col items-center justify-center h-full bg-[#f6f7fb] text-slate-500">
+        <Loader2 className="h-10 w-10 animate-spin text-[#7c6cf0] mb-4" />
+        <p className="font-medium">Loading conversation...</p>
       </div>
     );
   }
 
   if (!conversation) {
     return (
-      <div className="flex items-center justify-center h-full">
-        <p className="text-gray-500">Conversation not found</p>
+      <div className="flex items-center justify-center h-full text-gray-500">
+        <p>Conversation not found</p>
       </div>
     );
   }
 
   return (
-    <div className="flex flex-col h-full bg-gray-50">
-      {/* Header - Modern WhatsApp-like */}
-      <div className="flex-none px-4 py-3 bg-white border-b shadow-sm flex items-center justify-between">
+    <div className="flex flex-col h-full bg-[#f9f9ff]">
+      {/* Header */}
+      <div className="flex-none px-4 py-4 bg-gradient-to-r from-[#f6f3ff] to-white text-slate-900 shadow-sm flex items-center justify-between border-b border-slate-100">
         <div className="flex items-center gap-3 flex-1 min-w-0">
           {onBack && (
-            <Button variant="ghost" size="icon" onClick={onBack} className="flex-shrink-0">
+            <Button variant="ghost" size="icon" onClick={onBack} className="flex-shrink-0 text-slate-500">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
           
-          <Avatar className="h-11 w-11 flex-shrink-0 ring-2 ring-blue-100">
-            <AvatarFallback className="bg-gradient-to-br from-blue-400 to-blue-600 text-white font-semibold">
+          <Avatar className="h-11 w-11 flex-shrink-0 ring-2 ring-white">
+            <AvatarFallback className="bg-[#ede9ff] text-[#4c47ff] font-semibold">
               {conversation.contactName?.[0]?.toUpperCase() || conversation.contactPhone?.[0] || '?'}
             </AvatarFallback>
           </Avatar>
-          
-          <div className="flex-1 min-w-0">
-            <h2 className="font-semibold text-gray-900 truncate">
-              {conversation.contactName || 'Unknown'}
-            </h2>
-            <div className="flex items-center gap-2 text-sm text-gray-500">
+
+          <div className="flex-1 min-w-0 space-y-1">
+            {!isEditingName ? (
+              <div className="flex items-center gap-2 min-w-0">
+                <h2 className="font-semibold text-slate-900 truncate">
+                  {conversation.contactName || 'Unknown'}
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-slate-500 hover:text-slate-900"
+                  onClick={() => setIsEditingName(true)}
+                >
+                  <Edit3 className="h-4 w-4" />
+                </Button>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={contactNameInput}
+                  onChange={(e) => setContactNameInput(e.target.value)}
+                  className="h-9"
+                />
+                <Button
+                  size="icon"
+                  variant="secondary"
+                  disabled={updatingName}
+                  onClick={handleUpdateContactName}
+                  className="bg-[#4c47ff] text-white hover:bg-[#3c3add]"
+                >
+                  <Check className="h-4 w-4" />
+                </Button>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  onClick={() => {
+                    setIsEditingName(false);
+                    setContactNameInput(conversation.contactName || '');
+                  }}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+            <div className="flex items-center gap-2 text-sm text-slate-500">
               <Phone className="h-3 w-3" />
               <span className="truncate">{conversation.contactPhone}</span>
             </div>
@@ -352,15 +485,15 @@ export function MessageThread({ conversationId, onBack }: Props) {
 
         <div className="flex items-center gap-2 flex-shrink-0">
           {isConnected && (
-            <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
-              <div className="w-1.5 h-1.5 bg-green-500 rounded-full mr-1.5 animate-pulse" />
+            <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-600 border-emerald-100">
+              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1.5 animate-pulse" />
               Live
             </Badge>
           )}
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-900">
                 <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
@@ -378,27 +511,29 @@ export function MessageThread({ conversationId, onBack }: Props) {
         </div>
       </div>
 
-      {/* Messages Area - WhatsApp-like background */}
+      {/* Messages Area */}
       <div 
-        className="flex-1 overflow-y-auto py-4"
+        className="flex-1 min-h-0 overflow-y-auto py-6 px-2 sm:px-6"
         style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e5e7eb' fill-opacity='0.15'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
-          backgroundColor: '#f0f2f5'
+          backgroundImage:
+            "linear-gradient(180deg, rgba(247,244,255,0.7) 0%, rgba(249,249,255,0.4) 35%, #f9f9ff 100%)",
         }}
       >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
-            <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-md">
-              <MessageSquare className="h-16 w-16 mx-auto mb-4 text-gray-300" />
-              <p className="text-lg font-medium text-gray-700 mb-2">No messages yet</p>
-              <p className="text-sm text-gray-500">
+            <div className="bg-white p-8 rounded-3xl shadow-sm text-center max-w-md border border-slate-100">
+              <MessageSquare className="h-16 w-16 mx-auto mb-4 text-slate-300" />
+              <p className="text-lg font-medium text-slate-700 mb-2">No messages yet</p>
+              <p className="text-sm text-slate-500">
                 Start the conversation by sending a message below
               </p>
             </div>
           </div>
         ) : (
           <>
-            {messages.map((message, index) => renderMessage(message, index))}
+            <div className="space-y-1">
+              {messages.map((message, index) => renderMessage(message, index))}
+            </div>
             
             {/* Typing indicator */}
             {isTyping && (
@@ -418,8 +553,8 @@ export function MessageThread({ conversationId, onBack }: Props) {
         )}
       </div>
 
-      {/* Input Area - Modern design */}
-      <div className="flex-none px-4 py-3 bg-white border-t shadow-lg">
+      {/* Input Area */}
+      <div className="flex-none px-4 py-4 bg-white border-t border-slate-100">
         <form onSubmit={handleSendMessage} className="flex items-end gap-2">
           <div className="flex-1 relative">
             <Input
@@ -433,13 +568,13 @@ export function MessageThread({ conversationId, onBack }: Props) {
               }}
               onKeyPress={handleKeyPress}
               disabled={isSending}
-              className="pr-10 py-6 rounded-full border-gray-300 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              className="pr-10 py-6 rounded-2xl border-slate-200 bg-slate-50 focus:ring-2 focus:ring-[#4c47ff] focus:border-transparent"
             />
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
             >
               <Paperclip className="h-5 w-5" />
             </Button>
@@ -448,7 +583,7 @@ export function MessageThread({ conversationId, onBack }: Props) {
           <Button 
             type="submit" 
             disabled={!newMessage.trim() || isSending}
-            className="rounded-full h-12 w-12 p-0 bg-blue-500 hover:bg-blue-600 shadow-lg disabled:opacity-50"
+            className="rounded-2xl h-12 w-12 p-0 bg-[#4c47ff] hover:bg-[#3c3add] text-white shadow-lg disabled:opacity-50"
           >
             {isSending ? (
               <Loader2 className="h-5 w-5 animate-spin" />

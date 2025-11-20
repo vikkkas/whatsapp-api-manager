@@ -32,6 +32,11 @@ export const WebSocketProvider: React.FC<Props> = ({ children }) => {
   const { addConversation, updateConversation, addTypingUser, removeTypingUser, incrementUnreadCount, selectedConversationId } = useConversationStore();
   const { addMessage, updateMessage } = useMessageStore();
   const [isConnected, setIsConnected] = React.useState(false);
+  const selectedConversationRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    selectedConversationRef.current = selectedConversationId;
+  }, [selectedConversationId]);
 
   useEffect(() => {
     if (isAuthenticated && token) {
@@ -53,7 +58,10 @@ export const WebSocketProvider: React.FC<Props> = ({ children }) => {
         addMessage(message.conversationId, message);
 
         // Increment unread count if conversation is not selected
-        if (message.conversationId !== selectedConversationId && message.direction === 'INBOUND') {
+        if (
+          message.conversationId !== selectedConversationRef.current &&
+          message.direction === 'INBOUND'
+        ) {
           incrementUnreadCount(message.conversationId);
         }
 
@@ -68,8 +76,9 @@ export const WebSocketProvider: React.FC<Props> = ({ children }) => {
         // Find which conversation this message belongs to and update it
         // This is a limitation - we'd need to track message->conversation mapping
         // For now, we'll update in the current conversation
-        if (selectedConversationId) {
-          updateMessage(selectedConversationId, messageId, { status: status as any });
+        const activeConversation = selectedConversationRef.current;
+        if (activeConversation) {
+          updateMessage(activeConversation, messageId, { status: status as any });
         }
       });
 

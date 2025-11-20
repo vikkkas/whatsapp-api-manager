@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -18,7 +18,7 @@ import {
   AlertCircle,
   Check
 } from 'lucide-react';
-import { messageAPI } from '../lib/api';
+import { messageAPI, settingsAPI } from '../lib/api';
 import { toast } from 'sonner';
 
 const SendMessageEnhanced = () => {
@@ -31,6 +31,7 @@ const SendMessageEnhanced = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
+  const [phoneNumberId, setPhoneNumberId] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -120,8 +121,12 @@ const SendMessageEnhanced = () => {
       }
 
       // Send message
+      if (!phoneNumberId) {
+        throw new Error('Configure your WhatsApp phone number in Settings first.');
+      }
+
       const messageData: any = {
-        phoneNumberId: 'YOUR_PHONE_NUMBER_ID', // TODO: Get from settings
+        phoneNumberId,
         to: formattedPhone,
         type: messageType,
       };
@@ -407,3 +412,14 @@ const SendMessageEnhanced = () => {
 };
 
 export default SendMessageEnhanced;
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await settingsAPI.get();
+        setPhoneNumberId(response.settings?.waba?.phoneNumberId || '');
+      } catch (error) {
+        console.error('Failed to load settings', error);
+      }
+    };
+    fetchSettings();
+  }, []);
