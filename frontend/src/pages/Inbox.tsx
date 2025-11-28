@@ -215,7 +215,7 @@ export default function Inbox() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-4">{renderConversationList()}</div>
+        <div className="flex-1 overflow-y-auto px-3 py-4 scroll-smooth">{renderConversationList()}</div>
       </div>
 
       {/* Message column */}

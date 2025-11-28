@@ -11,7 +11,7 @@ interface OnboardingGuardProps {
 const PUBLIC_PATHS = ['/settings', '/login', '/logout', '/'];
 
 // 🚧 DEVELOPMENT MODE: Bypass onboarding guard
-const BYPASS_ONBOARDING = true; // Set to false in production
+const BYPASS_ONBOARDING = false; // Set to false in production
 
 export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) => {
   const location = useLocation();

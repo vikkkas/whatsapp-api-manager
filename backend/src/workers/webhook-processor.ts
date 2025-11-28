@@ -1,45 +1,13 @@
 import { Worker, Job } from 'bullmq';
-import axios from 'axios';
 import { createRedisConnection } from '../config/redis.js';
 import prisma from '../config/prisma.js';
 import { resolveTenantFromPhoneNumberId } from '../utils/tenantHelpers.js';
 import { log } from '../utils/logger.js';
 import { normalizePhoneNumber } from '../utils/phone.js';
+import { publishWebSocketEvent } from '../services/pubsub.js';
 
 const connection = createRedisConnection();
-const INTERNAL_API_BASE =
-  process.env.INTERNAL_API_URL || `http://localhost:${process.env.PORT || 3000}`;
 
-async function notifyInternal(path: string, payload: Record<string, any>) {
-  if (!process.env.INTERNAL_API_TOKEN) {
-    return;
-  }
-
-  try {
-    await axios.post(`${INTERNAL_API_BASE}${path}`, payload, {
-      headers: {
-        'x-internal-token': process.env.INTERNAL_API_TOKEN,
-      },
-      timeout: 5000,
-    });
-  } catch (error: any) {
-    log.error('Failed to notify realtime event', {
-      error: error?.message || error,
-      path,
-    });
-  }
-}
-
-function notifyRealtimeNewMessage(conversationId: string, message: any) {
-  return notifyInternal('/api/internal/events/message', { conversationId, message });
-}
-
-function notifyConversationUpdate(conversation: any) {
-  return notifyInternal('/api/internal/events/conversation', {
-    conversationId: conversation.id,
-    conversation,
-  });
-}
 
 interface WebhookJob {
   rawEventId: string;
@@ -220,6 +188,18 @@ async function processInboundMessage(
     update: profileName ? { name: profileName } : {},
   });
 
+  // Check if conversation exists
+  const existingConversation = await prisma.conversation.findUnique({
+    where: {
+      tenantId_contactPhone: {
+        tenantId,
+        contactPhone: normalizedFrom,
+      },
+    },
+  });
+
+  const isNewConversation = !existingConversation;
+
   let conversation = await prisma.conversation.upsert({
     where: {
       tenantId_contactPhone: {
@@ -243,6 +223,14 @@ async function processInboundMessage(
     },
   });
 
+  // Publish new conversation event to Redis
+  if (isNewConversation) {
+    await publishWebSocketEvent({
+      type: 'conversation:new',
+      data: { conversation },
+    });
+  }
+
   if (profileName && conversation.contactName !== profileName) {
     conversation = await prisma.conversation.update({
       where: { id: conversation.id },
@@ -252,8 +240,12 @@ async function processInboundMessage(
       where: { id: contact.id },
       data: { name: profileName },
     });
-    await notifyConversationUpdate(conversation);
+    await publishWebSocketEvent({
+      type: 'conversation:updated',
+      data: { conversationId: conversation.id, conversation },
+    });
   }
+
 
   // Determine message type and content
   let messageType: string = 'TEXT';
@@ -321,7 +313,11 @@ async function processInboundMessage(
     },
   });
 
-  await notifyRealtimeNewMessage(conversation.id, savedMessage);
+  // Publish notification event (includes message data)
+  await publishWebSocketEvent({
+    type: 'notification:new',
+    data: { type: 'message', conversationId: conversation.id, message: savedMessage },
+  });
 
   log.info('Inbound message saved', { waMessageId, conversationId: conversation.id });
 }

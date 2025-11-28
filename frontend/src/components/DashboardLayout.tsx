@@ -24,7 +24,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <SidebarProvider>
-      <div className="relative flex min-h-screen w-full bg-[#f6f7fb] text-slate-900">
+      <div className="relative flex h-screen w-full bg-[#f6f7fb] text-slate-900 overflow-hidden">
         <AppSidebar />
         <div className="relative flex flex-1 flex-col">
           <header className="sticky top-0 z-10 border-b border-transparent bg-white/80 backdrop-blur">

@@ -18,7 +18,7 @@ interface AuthenticatedSocket extends Socket {
 
 let io: Server | null = null;
 
-export function setupWebSocket(server: HTTPServer): Server {
+export async function setupWebSocket(server: HTTPServer): Promise<Server> {
   io = new Server(server, {
     cors: {
       origin: process.env.FRONTEND_URL || 'http://localhost:8080',
@@ -139,6 +139,35 @@ export function setupWebSocket(server: HTTPServer): Server {
     });
   });
 
+  // Subscribe to Redis pub/sub for events from workers
+  const { subscribeToWebSocketEvents } = await import('./pubsub.js');
+  subscribeToWebSocketEvents((event) => {
+    log.info('Received WebSocket event from Redis', { type: event.type });
+    
+    switch (event.type) {
+      case 'message:new':
+        if (event.data.conversationId && event.data.message) {
+          broadcastNewMessage(event.data.conversationId, event.data.message);
+        }
+        break;
+      case 'conversation:new':
+        if (event.data.conversation) {
+          broadcastNewConversation(event.data.conversation);
+        }
+        break;
+      case 'conversation:updated':
+        if (event.data.conversationId && event.data.conversation) {
+          broadcastConversationUpdate(event.data.conversationId, event.data.conversation);
+        }
+        break;
+      case 'notification:new':
+        if (event.data.message && event.data.message.tenantId) {
+          io.to(`tenant:${event.data.message.tenantId}`).emit('notification:new', event.data);
+        }
+        break;
+    }
+  });
+
   log.info('WebSocket server initialized');
   return io;
 }
@@ -151,7 +180,18 @@ export function broadcastNewMessage(conversationId: string, message: any): void 
     return;
   }
 
+  // Broadcast to conversation room
   io.to(`conversation:${conversationId}`).emit('message:new', message);
+  
+  // Also broadcast to tenant room for notifications
+  if (message.tenantId) {
+    io.to(`tenant:${message.tenantId}`).emit('notification:new', {
+      type: 'message',
+      conversationId,
+      message,
+    });
+  }
+  
   log.info('Broadcasted new message', { conversationId, messageId: message.id });
 }
 
@@ -167,8 +207,25 @@ export function broadcastMessageStatus(conversationId: string, messageId: string
 export function broadcastConversationUpdate(conversationId: string, conversation: any): void {
   if (!io) return;
 
+  // Broadcast to conversation room
   io.to(`conversation:${conversationId}`).emit('conversation:updated', conversation);
+  
+  // Also broadcast to tenant room so all users see the update
+  if (conversation.tenantId) {
+    io.to(`tenant:${conversation.tenantId}`).emit('conversation:updated', conversation);
+  }
+  
   log.info('Broadcasted conversation update', { conversationId });
+}
+
+export function broadcastNewConversation(conversation: any): void {
+  if (!io) return;
+
+  // Broadcast new conversation to all users in the tenant
+  if (conversation.tenantId) {
+    io.to(`tenant:${conversation.tenantId}`).emit('conversation:new', conversation);
+    log.info('Broadcasted new conversation', { conversationId: conversation.id });
+  }
 }
 
 export function notifyUser(userId: string, event: string, data: any): void {
@@ -180,3 +237,4 @@ export function notifyUser(userId: string, event: string, data: any): void {
 export function getIO(): Server | null {
   return io;
 }
+

@@ -164,8 +164,11 @@ app.use((err: ApiError, req: Request, res: Response, _next: NextFunction) => {
 // ============================================
 const httpServer = createServer(app);
 
-// Setup WebSocket
-const io = setupWebSocket(httpServer);
+// Setup WebSocket (async)
+let io: any;
+(async () => {
+  io = await setupWebSocket(httpServer);
+})();
 
 const server = httpServer.listen(PORT, () => {
   log.info(`🚀 Server started on port ${PORT}`);

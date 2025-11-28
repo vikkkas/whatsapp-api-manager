@@ -88,7 +88,9 @@ export function MessageThread({ conversationId, onBack }: Props) {
       leaveConversation(conversationId);
       stopTyping(conversationId);
     };
-  }, [conversationId, joinConversation, leaveConversation, loadConversation, stopTyping]);
+    // Only re-run when conversationId changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conversationId]);
 
   useEffect(() => {
     setContactNameInput(conversation?.contactName || '');
@@ -107,7 +109,14 @@ export function MessageThread({ conversationId, onBack }: Props) {
     fetchSettings();
   }, []);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom when messages change
+  useEffect(() => {
+    if (messages.length > 0) {
+      scrollToBottom('smooth');
+    }
+  }, [messages.length]);
+
+  // Initial scroll on conversation load
   useEffect(() => {
     scrollToBottom('auto');
   }, [conversationId]);
@@ -513,7 +522,7 @@ export function MessageThread({ conversationId, onBack }: Props) {
 
       {/* Messages Area */}
       <div 
-        className="flex-1 min-h-0 overflow-y-auto py-6 px-2 sm:px-6"
+        className="flex-1 min-h-0 overflow-y-auto py-6 px-2 sm:px-6 scroll-smooth"
         style={{
           backgroundImage:
             "linear-gradient(180deg, rgba(247,244,255,0.7) 0%, rgba(249,249,255,0.4) 35%, #f9f9ff 100%)",
