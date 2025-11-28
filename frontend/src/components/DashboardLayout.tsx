@@ -79,10 +79,10 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
               </div>
             </div>
           </header>
-          <main className="relative flex-1 overflow-hidden">
-            <div className="mx-auto flex h-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 overflow-hidden w-full">
-              <div className="flex-1 min-h-0 flex flex-col overflow-hidden">
-                <div className="flex-1 min-h-0 overflow-hidden">
+          <main className="relative flex-1 overflow-auto">
+            <div className="mx-auto flex h-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 w-full">
+              <div className="flex-1 min-h-0 flex flex-col">
+                <div className="flex-1 min-h-0">
                   {children}
                 </div>
               </div>
