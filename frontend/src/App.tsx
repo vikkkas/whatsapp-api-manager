@@ -13,6 +13,8 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
 
 // Lazy load pages for better performance
+const LandingPage = lazy(() => import("./pages/LandingPage"));
+const SignUpPage = lazy(() => import("./pages/SignUpPage"));
 const Login = lazy(() => import("./pages/Login"));
 const Inbox = lazy(() => import("./pages/Inbox"));
 const SendMessage = lazy(() => import("./pages/SendMessage"));
@@ -53,11 +55,13 @@ const App = () => (
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   {/* Public routes */}
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/signup" element={<SignUpPage />} />
                   <Route path="/login" element={<Login />} />
                   
                   {/* Protected routes with dashboard layout */}
                   <Route
-                    path="/"
+                    path="/dashboard"
                     element={
                       <ProtectedRoute>
                         <OnboardingGuard>

@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback } from '../components/ui/avatar';
 import { Badge } from '../components/ui/badge';
 import { Input } from '../components/ui/input';
 import { Button } from '../components/ui/button';
-import { Loader2, Search, MessageSquare, RefreshCw } from 'lucide-react';
+import { Loader2, Search, MessageSquare, RefreshCw, Filter, MoreHorizontal, Phone, Video, Info } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { MessageThread } from '../components/MessageThread';
 import { toast } from 'sonner';
@@ -77,69 +77,83 @@ export default function Inbox() {
   const getTypingIndicator = (conversationId: string) => {
     const users = typingUsers.get(conversationId);
     if (!users || users.size === 0) return null;
-    return <span className="text-xs text-[#4c47ff]">typing…</span>;
+    return <span className="text-xs font-bold text-blue-600 animate-pulse">typing...</span>;
   };
 
   const renderConversationList = () => {
     if (isLoading) {
       return (
-        <div className="flex flex-col items-center justify-center h-64 text-slate-500">
-          <Loader2 className="h-10 w-10 animate-spin text-[#7c6cf0] mb-4" />
-          <p>Loading conversations…</p>
+        <div className="flex flex-col items-center justify-center h-64 text-gray-400">
+          <Loader2 className="h-8 w-8 animate-spin mb-4" />
+          <p className="font-medium">Loading chats...</p>
         </div>
       );
     }
 
     if (filteredConversations.length === 0) {
       return (
-        <div className="flex flex-col items-center justify-center h-64 text-slate-500 px-4">
-          <div className="bg-slate-50 p-10 rounded-3xl text-center max-w-md border border-slate-100">
-            <MessageSquare className="h-14 w-14 mb-4 text-slate-300 mx-auto" />
-            <p className="text-lg font-semibold mb-1 text-slate-800">No conversations found</p>
-            <p className="text-sm text-slate-500">
-              {searchQuery ? 'Try adjusting your search or filters' : 'New conversations will appear here'}
-            </p>
+        <div className="flex flex-col items-center justify-center h-64 text-gray-400 px-6 text-center">
+          <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
+            <MessageSquare className="h-8 w-8 text-gray-300" />
           </div>
+          <p className="text-lg font-bold text-gray-900 mb-1">No conversations</p>
+          <p className="text-sm">
+            {searchQuery ? 'Try adjusting your search' : 'New chats will appear here'}
+          </p>
         </div>
       );
     }
 
     return (
-      <div className="flex flex-col gap-3">
+      <div className="flex flex-col">
         {filteredConversations.map((conversation) => (
           <button
             key={conversation.id}
             onClick={() => selectConversation(conversation.id)}
-            className={`w-full text-left px-4 py-3 flex items-center gap-3 rounded-2xl border border-transparent transition ${
-              selectedConversationId === conversation.id
-                ? 'bg-[#f2f0ff] border-[#e0ddff]'
-                : 'bg-white hover:border-[#ece9ff]'
+            className={`w-full text-left px-4 py-4 flex items-start gap-3 border-b border-gray-100 hover:bg-gray-50 transition-colors ${
+              selectedConversationId === conversation.id ? 'bg-blue-50/50 hover:bg-blue-50/50' : ''
             }`}
           >
-            <Avatar className="h-12 w-12">
-              <AvatarFallback className="bg-[#ede9ff] text-[#4c47ff]">
-                {getInitials(conversation.contactName, conversation.contactPhone)}
-              </AvatarFallback>
-            </Avatar>
+            <div className="relative">
+              <Avatar className="h-12 w-12 border border-gray-100">
+                <AvatarFallback className={`font-bold ${
+                  selectedConversationId === conversation.id ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'
+                }`}>
+                  {getInitials(conversation.contactName, conversation.contactPhone)}
+                </AvatarFallback>
+              </Avatar>
+              {conversation.unreadCount > 0 && (
+                <span className="absolute -top-1 -right-1 w-5 h-5 bg-red-500 text-white text-[10px] font-bold flex items-center justify-center rounded-full border-2 border-white">
+                  {conversation.unreadCount}
+                </span>
+              )}
+            </div>
+            
             <div className="flex-1 min-w-0">
-              <div className="flex items-center justify-between gap-2">
-                <p className="font-semibold truncate text-slate-900">
+              <div className="flex items-center justify-between gap-2 mb-1">
+                <p className={`font-bold truncate ${
+                  conversation.unreadCount > 0 ? 'text-black' : 'text-gray-700'
+                }`}>
                   {conversation.contactName || conversation.contactPhone}
                 </p>
-                <span className="text-xs text-slate-400">
-                  {formatDistanceToNow(new Date(conversation.lastMessageAt), { addSuffix: true })}
+                <span className="text-[11px] font-medium text-gray-400 whitespace-nowrap">
+                  {formatDistanceToNow(new Date(conversation.lastMessageAt), { addSuffix: false })}
                 </span>
               </div>
-              <p className="text-sm text-slate-500 truncate">
-                {conversation.status === 'RESOLVED' ? 'Resolved' : 'Tap to view messages'}
-              </p>
-              {getTypingIndicator(conversation.id)}
+              
+              <div className="flex items-center justify-between">
+                <p className={`text-sm truncate pr-2 ${
+                  conversation.unreadCount > 0 ? 'font-semibold text-gray-900' : 'text-gray-500'
+                }`}>
+                  {getTypingIndicator(conversation.id) || (
+                    conversation.status === 'RESOLVED' ? 'Resolved' : 'Tap to view messages'
+                  )}
+                </p>
+                {conversation.status === 'OPEN' && (
+                  <div className="w-2 h-2 bg-green-500 rounded-full" />
+                )}
+              </div>
             </div>
-            {conversation.unreadCount > 0 && (
-              <span className="bg-[#f04f87]/10 text-[#f04f87] rounded-full px-2 py-1 text-xs font-semibold">
-                {conversation.unreadCount}
-              </span>
-            )}
           </button>
         ))}
       </div>
@@ -147,90 +161,91 @@ export default function Inbox() {
   };
 
   return (
-    <div className="flex h-full min-h-0 w-full bg-[#f6f7fb] text-slate-900 rounded-3xl shadow-sm border border-slate-100 overflow-hidden">
-      {/* Conversations column */}
+    <div className="flex h-full w-full bg-white overflow-hidden">
+      {/* Conversations List Column */}
       <div
-        className={`${showThread ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-[360px] bg-white border-r border-slate-100 overflow-hidden`}
+        className={`${showThread ? 'hidden md:flex' : 'flex'} flex-col w-full md:w-[380px] border-r border-gray-200 bg-white h-full`}
       >
-        <div className="flex-none px-4 py-4 border-b border-slate-100 bg-white/90 backdrop-blur">
+        {/* Header */}
+        <div className="flex-none px-4 py-3 border-b border-gray-200 bg-white">
           <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-[#efe9ff] rounded-2xl text-[#4c47ff]">
-                <MessageSquare className="h-5 w-5" />
-              </div>
-              <div>
-                <h1 className="text-xl font-semibold">Conversations</h1>
-                <p className="text-sm text-slate-500">
-                  {filteredConversations.length} conversation{filteredConversations.length !== 1 ? 's' : ''}
-                </p>
-              </div>
-            </div>
             <div className="flex items-center gap-2">
+              <h1 className="text-xl font-black tracking-tight">Inbox</h1>
+              <Badge variant="secondary" className="bg-gray-100 text-gray-600 font-bold border-0">
+                {filteredConversations.length}
+              </Badge>
+            </div>
+            <div className="flex items-center gap-1">
               {isConnected && (
-                <Badge variant="outline" className="bg-emerald-50 text-emerald-600 border-emerald-100 px-3 py-1">
-                  <div className="w-2 h-2 bg-emerald-500 rounded-full mr-2 animate-pulse" />
-                  Live
-                </Badge>
+                <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse mr-2" title="Connected" />
               )}
               <Button
-                variant="outline"
-                size="sm"
+                variant="ghost"
+                size="icon"
                 onClick={loadConversations}
-                className="gap-2 border-slate-200 text-slate-600 hover:bg-slate-50"
+                className="h-8 w-8 text-gray-500 hover:text-black hover:bg-gray-100"
               >
                 <RefreshCw className="h-4 w-4" />
-                Refresh
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-500 hover:text-black hover:bg-gray-100"
+              >
+                <Filter className="h-4 w-4" />
               </Button>
             </div>
           </div>
 
-          <div className="flex flex-col gap-3">
+          <div className="space-y-3">
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 type="text"
-                placeholder="Search or start new chat"
+                placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 bg-slate-50 border-slate-100 text-slate-900 placeholder:text-slate-400"
+                className="pl-10 bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-500 transition-all font-medium"
               />
             </div>
-            <div className="flex flex-wrap gap-2">
+            
+            <div className="flex gap-1 overflow-x-auto pb-1 no-scrollbar">
               {STATUS_TABS.map((status) => (
-                <Button
+                <button
                   key={status}
-                  variant={statusFilter === status ? 'default' : 'outline'}
-                  size="sm"
                   onClick={() => setStatusFilter(status)}
-                  className={`flex-shrink-0 rounded-full border ${
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors ${
                     statusFilter === status
-                      ? 'bg-[#4c47ff] border-[#4c47ff] text-white'
-                      : 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                      ? 'bg-black text-white'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                   }`}
                 >
                   {status}
-                </Button>
+                </button>
               ))}
             </div>
           </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto px-3 py-4 scroll-smooth">{renderConversationList()}</div>
+        {/* List */}
+        <div className="flex-1 overflow-y-auto">
+          {renderConversationList()}
+        </div>
       </div>
 
-      {/* Message column */}
-      <div className={`${showThread ? 'flex' : 'hidden md:flex'} flex-1 min-h-0 bg-[#f9f9ff] overflow-hidden`}>
+      {/* Chat Area Column */}
+      <div className={`${showThread ? 'flex' : 'hidden md:flex'} flex-1 flex-col h-full bg-white relative`}>
         {showThread ? (
-          <div className="flex-1 min-h-0">
-            <MessageThread conversationId={selectedConversationId!} onBack={() => selectConversation(null)} />
-          </div>
+          <MessageThread conversationId={selectedConversationId!} onBack={() => selectConversation(null)} />
         ) : (
-          <div className="hidden md:flex flex-1 items-center justify-center text-slate-400">
-            <div className="text-center space-y-2">
-              <MessageSquare className="h-12 w-12 mx-auto text-slate-300" />
-              <p className="text-lg font-medium text-slate-700">Select a conversation to start messaging</p>
-              <p className="text-sm text-slate-500">Choose a chat from the left to view the full timeline.</p>
+          <div className="flex-1 flex flex-col items-center justify-center text-center p-8 bg-gray-50/50">
+            <div className="w-24 h-24 bg-white rounded-2xl shadow-sm border border-gray-100 flex items-center justify-center mb-6">
+              <MessageSquare className="h-10 w-10 text-gray-300" />
             </div>
+            <h2 className="text-2xl font-black text-gray-900 mb-2">Select a conversation</h2>
+            <p className="text-gray-500 max-w-sm">
+              Choose a chat from the list to view messages, media, and contact details.
+            </p>
           </div>
         )}
       </div>

@@ -24,69 +24,51 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   return (
     <SidebarProvider>
-      <div className="relative flex h-screen w-full bg-[#f6f7fb] text-slate-900 overflow-hidden">
+      <div className="relative flex h-screen w-full bg-white text-foreground overflow-hidden">
         <AppSidebar />
-        <div className="relative flex flex-1 flex-col">
-          <header className="sticky top-0 z-10 border-b border-transparent bg-white/80 backdrop-blur">
-            <div className="mx-auto flex max-w-6xl flex-col gap-4 px-4 py-4 md:flex-row md:items-center md:justify-between">
-              <div className="flex items-start gap-4">
-                <SidebarTrigger className="rounded-full border border-slate-200 bg-white text-slate-700 shadow-sm md:hidden" />
-                <div>
-                  <h1 className="text-2xl font-semibold text-slate-900">
-                    {currentTenant?.name || 'Workspace'}
-                  </h1>
-                  <p className="text-sm text-slate-500">
-                    {currentUser?.name ? `Welcome back, ${currentUser.name}` : 'Manage your WhatsApp communications'}
-                  </p>
+        <div className="relative flex flex-1 flex-col h-full overflow-hidden">
+          <header className="sticky top-0 z-10 border-b border-gray-200 bg-white h-16 flex-none">
+            <div className="flex h-full items-center justify-between px-6">
+              <div className="flex items-center gap-4">
+                <SidebarTrigger className="md:hidden" />
+                <div className="flex items-center gap-2 text-sm font-medium text-gray-500">
+                  <span className="text-black font-bold">{currentTenant?.name || 'Workspace'}</span>
+                  <span>/</span>
+                  <span className="text-gray-900">{navLinks.find(n => location.pathname.startsWith(n.path))?.label || 'Dashboard'}</span>
                 </div>
               </div>
-              <div className="flex flex-wrap items-center gap-3">
+
+              <div className="flex items-center gap-4">
                 {currentTenant?.plan && (
-                  <span className="inline-flex items-center rounded-full border border-slate-200 bg-[#f1f2ff] px-3 py-1 text-xs font-medium text-[#4c47ff]">
-                    <Sparkles className="mr-2 h-3 w-3" />
-                    {currentTenant.plan} plan
+                  <span className="hidden md:inline-flex items-center rounded-full bg-yellow-100 px-2.5 py-0.5 text-xs font-bold text-yellow-800">
+                    <Sparkles className="mr-1 h-3 w-3" />
+                    {currentTenant.plan.toUpperCase()}
                   </span>
                 )}
-                <Button asChild variant="outline" className="border-slate-200 text-slate-700 hover:bg-slate-50">
-                  <Link to="/settings">
-                    <ShieldCheck className="mr-2 h-4 w-4" />
-                    Manage Workspace
-                  </Link>
-                </Button>
-              </div>
-            </div>
-            <div className="mx-auto flex max-w-6xl items-center gap-3 px-4 pb-4">
-              <div className="flex flex-1 flex-wrap gap-3 rounded-2xl bg-slate-50 px-3 py-2 text-sm font-medium text-slate-500">
-                {navLinks.map((nav) => {
-                  const isActive = location.pathname.startsWith(nav.path);
-                  return (
-                    <Link
-                      key={nav.label}
-                      to={nav.path}
-                      className={`rounded-xl px-3 py-1 ${
-                        isActive
-                          ? 'bg-white text-[#4c47ff] shadow-sm'
-                          : 'text-slate-500 hover:text-slate-700'
-                      }`}
-                    >
-                      {nav.label}
-                    </Link>
-                  );
-                })}
-              </div>
-              <div className="hidden md:flex items-center gap-3 text-sm text-slate-400">
-                <span>{currentUser?.email}</span>
+                
+                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+                  {navLinks.map((nav) => {
+                    const isActive = location.pathname.startsWith(nav.path);
+                    return (
+                      <Link
+                        key={nav.label}
+                        to={nav.path}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all ${
+                          isActive
+                            ? 'bg-white text-black shadow-sm'
+                            : 'text-gray-500 hover:text-gray-900'
+                        }`}
+                      >
+                        {nav.label}
+                      </Link>
+                    );
+                  })}
+                </div>
               </div>
             </div>
           </header>
-          <main className="relative flex-1 overflow-auto">
-            <div className="mx-auto flex h-full max-w-6xl flex-1 flex-col gap-6 px-4 py-8 w-full">
-              <div className="flex-1 min-h-0 flex flex-col">
-                <div className="flex-1 min-h-0">
-                  {children}
-                </div>
-              </div>
-            </div>
+          <main className="flex-1 overflow-y-auto overflow-x-hidden relative">
+            {children}
           </main>
         </div>
       </div>

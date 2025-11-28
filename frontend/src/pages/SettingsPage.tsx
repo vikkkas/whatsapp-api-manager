@@ -17,14 +17,16 @@ import {
   Sparkles,
   Webhook,
   Zap,
+  Settings,
+  RefreshCw
 } from 'lucide-react';
-import { settingsAPI } from '../lib/api';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Alert, AlertDescription } from '../components/ui/alert';
-import { Badge } from '../components/ui/badge';
+import { settingsAPI } from '@/lib/api';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 
 interface WABASettings {
   phoneNumberId: string;
@@ -181,17 +183,17 @@ const SettingsPage = () => {
 
   const getQualityBadge = (quality?: string) => {
     if (!quality) {
-      return <Badge className="border border-slate-200 bg-slate-100 text-slate-600">UNSET</Badge>;
+      return <Badge className="bg-gray-100 text-gray-600 border-none">UNSET</Badge>;
     }
 
     const variants: Record<string, string> = {
-      GREEN: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
-      YELLOW: 'bg-amber-50 text-amber-700 border border-amber-200',
-      RED: 'bg-rose-50 text-rose-700 border border-rose-200',
+      GREEN: 'bg-green-100 text-green-700 border-none',
+      YELLOW: 'bg-yellow-100 text-yellow-700 border-none',
+      RED: 'bg-red-100 text-red-700 border-none',
     };
 
     return (
-      <Badge className={variants[quality] || 'border border-slate-200 bg-slate-100 text-slate-600'}>
+      <Badge className={variants[quality] || 'bg-gray-100 text-gray-600 border-none'}>
         {quality}
       </Badge>
     );
@@ -230,8 +232,8 @@ const SettingsPage = () => {
 
   if (isLoading) {
     return (
-      <div className="flex h-[70vh] items-center justify-center bg-slate-50">
-        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+      <div className="flex h-[70vh] items-center justify-center bg-gray-50">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
       </div>
     );
   }
@@ -239,415 +241,395 @@ const SettingsPage = () => {
   const isOnboarded = settings.isValid && settings.phoneNumberId && settings.accessToken;
 
   return (
-    <div className="relative min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100 text-slate-900">
-      <div className="pointer-events-none absolute inset-0">
-        <div className="absolute left-10 top-10 h-32 w-32 rounded-full bg-blue-200/40 blur-3xl" />
-        <div className="absolute right-20 top-40 h-40 w-40 rounded-full bg-purple-200/50 blur-[90px]" />
+    <div className="p-8 max-w-7xl mx-auto space-y-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Settings</h1>
+          <p className="text-gray-500 mt-1">Manage your WhatsApp Business API configuration.</p>
+        </div>
+        <div className="flex gap-3">
+          <Button
+            variant="outline"
+            className="bg-white border-gray-200"
+            onClick={() => window.open('https://developers.facebook.com/', '_blank')}
+          >
+            <ExternalLink className="mr-2 h-4 w-4" />
+            Meta Docs
+          </Button>
+          <Button
+            className="bg-black text-white hover:bg-gray-800 shadow-lg"
+            onClick={handleSaveSettings}
+            disabled={isSaving || !settings.isValid}
+          >
+            {isSaving ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving
+              </>
+            ) : (
+              <>
+                <Sparkles className="mr-2 h-4 w-4" />
+                Save Changes
+              </>
+            )}
+          </Button>
+        </div>
       </div>
 
-      <div className="relative z-10 mx-auto max-w-6xl space-y-8 px-4 py-10">
-        <header className="rounded-[32px] border border-slate-200 bg-white/90 px-6 py-8 shadow-lg backdrop-blur">
-          <div className="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+      {!isOnboarded && (
+        <Alert className="border-amber-200 bg-amber-50 text-amber-900">
+          <ShieldCheck className="h-4 w-4" />
+          <AlertDescription className="text-sm font-medium">
+            Configure your Meta credentials and webhook token to unlock messaging, analytics, and automation.
+          </AlertDescription>
+        </Alert>
+      )}
+
+      {/* Status Cards */}
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="border-none shadow-sm bg-white">
+          <CardContent className="flex items-center justify-between p-6">
             <div>
-              <p className="text-xs uppercase tracking-[0.3em] text-slate-500">Workspace Settings</p>
-              <h1 className="mt-2 text-4xl font-bold tracking-tight text-slate-900">
-                WhatsApp Business Integration
-              </h1>
-              <p className="mt-3 max-w-2xl text-base text-slate-600">
-                Securely manage Meta credentials, test connectivity, and generate webhook tokens for a
-                premium onboarding experience.
+              <p className="text-sm font-medium text-gray-500">Connection Status</p>
+              <p className="mt-2 text-2xl font-bold text-gray-900">
+                {isOnboarded ? 'Live' : 'Not Connected'}
               </p>
             </div>
-            <div className="flex flex-col gap-3 sm:flex-row">
+            {isOnboarded ? (
+              <div className="h-12 w-12 rounded-full bg-green-100 flex items-center justify-center">
+                <CheckCircle2 className="h-6 w-6 text-green-600" />
+              </div>
+            ) : (
+              <div className="h-12 w-12 rounded-full bg-amber-100 flex items-center justify-center">
+                <AlertCircle className="h-6 w-6 text-amber-600" />
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm bg-white">
+          <CardContent className="p-6">
+            <p className="text-sm font-medium text-gray-500">Quality Rating</p>
+            <div className="mt-2 flex items-center gap-2">
+              {getQualityBadge(settings.qualityRating)}
+              <span className="text-xs text-gray-400">Messaging health</span>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-none shadow-sm bg-white">
+          <CardContent className="p-6">
+            <p className="text-sm font-medium text-gray-500">Messaging Limit</p>
+            <p className="mt-2 text-2xl font-bold text-gray-900">
+              {settings.messagingLimit?.replace('TIER_', 'Tier ') || 'Unverified'}
+            </p>
+            <p className="text-xs text-gray-400 mt-1">Daily conversations allowed</p>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-8 lg:grid-cols-[1.7fr_1fr]">
+        {/* API Credentials */}
+        <Card className="border-none shadow-sm bg-white">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-900">
+              <Key className="h-5 w-5 text-gray-400" />
+              WhatsApp Business API Credentials
+            </CardTitle>
+            <CardDescription>
+              These values come from Meta Developers → WhatsApp → API Setup
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="phoneNumberId" className="font-medium text-gray-700">
+                Phone Number ID *
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="phoneNumberId"
+                  value={settings.phoneNumberId}
+                  onChange={(e) => setSettings({ ...settings, phoneNumberId: e.target.value })}
+                  placeholder="123456789012345"
+                  className="font-mono bg-gray-50 border-gray-200 focus:bg-white transition-all"
+                />
+                <Button
+                  variant="outline"
+                  className="border-gray-200"
+                  onClick={() => copyToClipboard(settings.phoneNumberId)}
+                  disabled={!settings.phoneNumberId}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="accessToken" className="font-medium text-gray-700">
+                Access Token *
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="accessToken"
+                  type={showToken ? 'text' : 'password'}
+                  value={settings.accessToken}
+                  onChange={(e) => setSettings({ ...settings, accessToken: e.target.value })}
+                  placeholder="EAABsbCS1iHgBA..."
+                  className="font-mono bg-gray-50 border-gray-200 focus:bg-white transition-all"
+                />
+                <Button
+                  variant="outline"
+                  className="border-gray-200"
+                  onClick={() => setShowToken((prev) => !prev)}
+                >
+                  {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Use long-lived tokens and rotate them regularly for production workloads.
+              </p>
+            </div>
+
+            <div className="grid gap-6 md:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="businessAccountId" className="font-medium text-gray-700">
+                  Business Account ID
+                </Label>
+                <Input
+                  id="businessAccountId"
+                  value={settings.businessAccountId}
+                  onChange={(e) => setSettings({ ...settings, businessAccountId: e.target.value })}
+                  placeholder="1234567890"
+                  className="font-mono bg-gray-50 border-gray-200 focus:bg-white transition-all"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label className="font-medium text-gray-700">Display Name</Label>
+                <Input
+                  value={settings.displayName}
+                  onChange={(e) => setSettings({ ...settings, displayName: e.target.value })}
+                  placeholder="Acme Corp Support"
+                  className="bg-gray-50 border-gray-200 focus:bg-white transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap gap-3 pt-4 border-t border-gray-100">
               <Button
                 variant="outline"
-                className="border-slate-300 text-slate-700 hover:bg-slate-50"
-                onClick={() => window.open('https://developers.facebook.com/', '_blank')}
+                className="bg-white border-gray-200"
+                onClick={handleTestConnection}
+                disabled={isTesting}
               >
-                <ExternalLink className="mr-2 h-4 w-4" />
-                Meta Docs
-              </Button>
-              <Button
-                className="bg-slate-900 text-white hover:bg-slate-800"
-                onClick={handleSaveSettings}
-                disabled={isSaving || !settings.isValid}
-              >
-                {isSaving ? (
+                {isTesting ? (
                   <>
                     <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Saving
+                    Testing
                   </>
                 ) : (
                   <>
-                    <Sparkles className="mr-2 h-4 w-4" />
-                    Save Changes
+                    <Zap className="mr-2 h-4 w-4" />
+                    Test Connection
                   </>
                 )}
               </Button>
+              <Button variant="ghost" className="text-gray-500 hover:text-gray-900" onClick={fetchSettings}>
+                Reset Form
+              </Button>
             </div>
-          </div>
-        </header>
+          </CardContent>
+        </Card>
 
-        {!isOnboarded && (
-          <Alert className="border-amber-200 bg-amber-50 text-amber-900">
-            <ShieldCheck className="h-4 w-4" />
-            <AlertDescription className="text-sm">
-              Configure your Meta credentials and webhook token to unlock messaging, analytics, and automation.
-            </AlertDescription>
-          </Alert>
-        )}
-
-        <div className="grid gap-4 md:grid-cols-3">
-          <Card className="border-slate-200 bg-white shadow-sm">
-            <CardContent className="flex items-center justify-between p-5">
-              <div>
-                <p className="text-sm text-slate-500">Connection Status</p>
-                <p className="mt-2 text-2xl font-semibold text-slate-900">
-                  {isOnboarded ? 'Live' : 'Not Connected'}
-                </p>
+        {/* Live Snapshot */}
+        <Card className="border-none shadow-sm bg-gradient-to-br from-blue-50 to-white">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-900">
+              <Sparkles className="h-5 w-5 text-blue-500" />
+              Live Snapshot
+            </CardTitle>
+            <CardDescription>
+              Confidence indicators pulled from your latest validation
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-xl border border-blue-100 bg-white px-4 py-3 shadow-sm">
+              <span className="text-sm text-gray-500">Status</span>
+              <span className="font-semibold text-gray-900">
+                {settings.isValid ? 'Verified' : 'Awaiting Validation'}
+              </span>
+            </div>
+            <div className="space-y-3 rounded-xl border border-blue-100 bg-white px-4 py-3 text-sm shadow-sm">
+              <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                <span className="text-gray-500">WhatsApp Number</span>
+                <span className="font-medium text-gray-900">{settings.phoneNumber || 'Unknown'}</span>
               </div>
-              {isOnboarded ? (
-                <CheckCircle2 className="h-10 w-10 text-emerald-500" />
-              ) : (
-                <AlertCircle className="h-10 w-10 text-amber-500" />
-              )}
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 bg-white shadow-sm">
-            <CardContent className="p-5">
-              <p className="text-sm text-slate-500">Quality Rating</p>
-              <div className="mt-2 flex items-center gap-2">
-                {getQualityBadge(settings.qualityRating)}
-                <span className="text-sm text-slate-500">Messaging health</span>
+              <div className="flex justify-between items-center border-b border-gray-50 pb-2">
+                <span className="text-gray-500">Display Name</span>
+                <span className="font-medium text-gray-900">{settings.displayName || 'Not set'}</span>
               </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 bg-white shadow-sm">
-            <CardContent className="p-5">
-              <p className="text-sm text-slate-500">Messaging Limit</p>
-              <p className="mt-2 text-2xl font-semibold text-slate-900">
-                {settings.messagingLimit?.replace('TIER_', 'Tier ') || 'Unverified'}
-              </p>
-              <p className="text-xs text-slate-500">Daily conversations allowed</p>
-            </CardContent>
-          </Card>
-        </div>
-
-        <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr]">
-          <Card className="border-slate-200 bg-white shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-900">
-                <Key className="h-5 w-5 text-slate-500" />
-                WhatsApp Business API Credentials
-              </CardTitle>
-              <CardDescription className="text-slate-500">
-                These values come from Meta Developers → WhatsApp → API Setup
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-5">
-              <div className="space-y-2">
-                <Label htmlFor="phoneNumberId" className="text-slate-700">
-                  <div className="flex items-center gap-2">
-                    <Phone className="h-4 w-4 text-slate-500" />
-                    Phone Number ID *
-                  </div>
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="phoneNumberId"
-                    value={settings.phoneNumberId}
-                    onChange={(e) => setSettings({ ...settings, phoneNumberId: e.target.value })}
-                    placeholder="123456789012345"
-                    className="font-mono"
-                  />
-                  <Button
-                    variant="outline"
-                    className="border-slate-200 text-slate-600 hover:bg-slate-50"
-                    onClick={() => copyToClipboard(settings.phoneNumberId)}
-                    disabled={!settings.phoneNumberId}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="accessToken" className="text-slate-700">
-                  <div className="flex items-center gap-2">
-                    <Key className="h-4 w-4 text-slate-500" />
-                    Access Token *
-                  </div>
-                </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="accessToken"
-                    type={showToken ? 'text' : 'password'}
-                    value={settings.accessToken}
-                    onChange={(e) => setSettings({ ...settings, accessToken: e.target.value })}
-                    placeholder="EAABsbCS1iHgBA..."
-                    className="font-mono"
-                  />
-                  <Button
-                    variant="outline"
-                    className="border-slate-200 text-slate-600 hover:bg-slate-50"
-                    onClick={() => setShowToken((prev) => !prev)}
-                  >
-                    {showToken ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                  </Button>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Use long-lived tokens and rotate them regularly for production workloads.
-                </p>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2">
-                <div className="space-y-2">
-                  <Label htmlFor="businessAccountId" className="text-slate-700">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="h-4 w-4 text-slate-500" />
-                      Business Account ID
-                    </div>
-                  </Label>
-                  <Input
-                    id="businessAccountId"
-                    value={settings.businessAccountId}
-                    onChange={(e) => setSettings({ ...settings, businessAccountId: e.target.value })}
-                    placeholder="1234567890"
-                    className="font-mono"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label className="text-slate-700">Display Name (auto populated)</Label>
-                  <Input
-                    value={settings.displayName}
-                    onChange={(e) => setSettings({ ...settings, displayName: e.target.value })}
-                    placeholder="Acme Corp Support"
-                  />
-                </div>
-              </div>
-
-              <div className="flex flex-wrap gap-3 pt-3">
-                <Button
-                  variant="outline"
-                  className="border-slate-300 text-slate-700 hover:bg-slate-50"
-                  onClick={handleTestConnection}
-                  disabled={isTesting}
-                >
-                  {isTesting ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Testing
-                    </>
-                  ) : (
-                    <>
-                      <Zap className="mr-2 h-4 w-4" />
-                      Test Connection
-                    </>
-                  )}
-                </Button>
-                <Button variant="ghost" className="text-slate-600 hover:bg-slate-100" onClick={fetchSettings}>
-                  Reset Form
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="border-slate-200 bg-gradient-to-b from-indigo-50 via-white to-white shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-900">
-                <Sparkles className="h-5 w-5 text-indigo-400" />
-                Live Connection Snapshot
-              </CardTitle>
-              <CardDescription>
-                Confidence indicators pulled from your latest validation
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4 text-slate-700">
-              <div className="flex items-center justify-between rounded-2xl border border-slate-200 bg-white px-4 py-3">
-                <span className="text-sm text-slate-500">Status</span>
-                <span className="font-semibold text-slate-900">
-                  {settings.isValid ? 'Verified' : 'Awaiting Validation'}
+              <div className="flex justify-between items-center">
+                <span className="text-gray-500">Last Validated</span>
+                <span className="font-medium text-gray-900">
+                  {settings.lastValidatedAt ? new Date(settings.lastValidatedAt).toLocaleString() : 'Never'}
                 </span>
               </div>
-              <div className="space-y-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm">
-                <div className="flex justify-between">
-                  <span>WhatsApp Number</span>
-                  <span className="font-medium text-slate-900">{settings.phoneNumber || 'Unknown'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Display Name</span>
-                  <span className="font-medium text-slate-900">{settings.displayName || 'Not set'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Last Validated</span>
-                  <span className="font-medium text-slate-900">
-                    {settings.lastValidatedAt ? new Date(settings.lastValidatedAt).toLocaleString() : 'Never'}
-                  </span>
-                </div>
-              </div>
-              <div className="rounded-2xl border border-indigo-200 bg-indigo-50 px-4 py-3 text-sm">
-                <p className="mb-1 font-semibold text-indigo-600">Pro Tips</p>
-                <ul className="list-disc list-inside space-y-1 text-indigo-700">
-                  <li>Validate after every credential rotation</li>
-                  <li>Keep a service account for secure automation</li>
-                  <li>Ensure your webhook token matches Meta</li>
-                </ul>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Card className="border-slate-200 bg-white shadow-lg">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-slate-900">
-                <Webhook className="h-5 w-5 text-slate-500" />
-                Webhook Configuration
-              </CardTitle>
-              <CardDescription className="text-slate-500">
-                Generate a verify token and use it inside Meta Developers when wiring the webhook
-              </CardDescription>
-            </CardHeader>
-          <CardContent className="grid gap-6 lg:grid-cols-2">
-            <div className="space-y-4">
-              <div className="flex flex-col gap-3 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-700">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-slate-500">Webhook Status</p>
-                    <p className="text-lg font-semibold text-slate-900">
-                      {webhookVerifiedAt ? 'Verified' : 'Awaiting Verification'}
-                    </p>
-                  </div>
-                  <Badge className={webhookVerifiedAt ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}>
-                    {webhookVerifiedAt ? 'Verified' : 'Pending'}
-                  </Badge>
-                </div>
-                <p className="text-xs text-slate-500">
-                  {webhookVerifiedAt
-                    ? `Verified on ${new Date(webhookVerifiedAt).toLocaleString()}`
-                    : 'Meta must ping your webhook URL with this verify token to complete the setup.'}
-                </p>
-                <Button
-                  variant="outline"
-                  className="border-slate-300 text-slate-700 hover:bg-slate-100"
-                  onClick={handleVerifyWebhook}
-                  disabled={isVerifyingWebhook || !verifyToken}
-                >
-                  {isVerifyingWebhook ? (
-                    <>
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                      Verifying
-                    </>
-                  ) : (
-                    <>
-                      <ShieldCheck className="mr-2 h-4 w-4" />
-                      Test Verification
-                    </>
-                  )}
-                </Button>
-                <div>
-                  <p className="mb-1 text-xs font-semibold text-slate-600">How verification works:</p>
-                  <ol className="list-decimal list-inside space-y-1 text-xs text-slate-600">
-                    <li>Go to Meta Developers → WhatsApp → Configuration</li>
-                    <li>Use the Webhook URL shown below</li>
-                    <li>Paste the verify token you generated here</li>
-                    <li>Click “Verify and Save” in Meta. You can also run “Test Verification”.</li>
-                  </ol>
-                </div>
-              </div>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="webhookUrl" className="text-slate-700">
-                    Webhook URL
-                  </Label>
-                <div className="flex gap-2">
-                  <Input
-                    id="webhookUrl"
-                    value={webhookUrl}
-                    onChange={(e) => setWebhookUrl(e.target.value)}
-                    placeholder="https://your-domain.com/api/webhook"
-                    className="font-mono"
-                  />
-                  <Button
-                    variant="outline"
-                    className="border-slate-200 text-slate-600 hover:bg-slate-50"
-                    onClick={() => copyToClipboard(webhookUrl)}
-                  >
-                    <Copy className="h-4 w-4" />
-                  </Button>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Deploy behind HTTPS and paste into Meta Developers → WhatsApp → Configuration → Webhooks.
-                </p>
-              </div>
-
-              <div className="space-y-2">
-                <Label htmlFor="verifyToken" className="flex items-center gap-2 text-slate-700">
-                  Verify Token
-                  <span className="rounded-full border border-slate-300 px-2 py-0.5 text-[10px] uppercase tracking-wide text-slate-500">
-                    Required
-                  </span>
-                </Label>
-                <div className="flex flex-col gap-3 md:flex-row">
-                  <div className="flex flex-1 gap-2">
-                    <Input
-                      id="verifyToken"
-                      value={verifyToken}
-                      onChange={(e) => setVerifyToken(e.target.value)}
-                      placeholder="secure-verify-token"
-                      className="font-mono"
-                    />
-                    <Button
-                      variant="outline"
-                      className="border-slate-200 text-slate-600 hover:bg-slate-50"
-                      onClick={() => copyToClipboard(verifyToken)}
-                    >
-                      <Copy className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <Button type="button" className="bg-slate-900 text-white hover:bg-slate-800" onClick={handleGenerateToken}>
-                    Generate Token
-                  </Button>
-                </div>
-                <p className="text-xs text-slate-500">
-                  Enter this token when configuring the webhook inside Meta Developers. We store it securely per tenant
-                  once you save.
-                </p>
-              </div>
             </div>
-
-            <div className="space-y-4 rounded-2xl border border-slate-200 bg-slate-50 p-6 text-slate-700">
-              <div className="flex items-center gap-3">
-                <Globe className="h-5 w-5 text-slate-500" />
-                <div>
-                  <p className="text-sm text-slate-500">Subscribed Events</p>
-                  <p className="text-sm">Enable these topics in Meta:</p>
-                </div>
-              </div>
-            </div>
-              <ul className="grid gap-2 text-sm">
-                {['messages', 'message_status', 'message_template_status_update', 'message_echoes'].map((event) => (
-                  <li
-                    key={event}
-                    className="flex items-center justify-between rounded-xl border border-slate-200 bg-white px-3 py-2 text-slate-900"
-                  >
-                    <span>{event}</span>
-                    <ShieldCheck className="h-4 w-4 text-emerald-500" />
-                  </li>
-                ))}
+            <div className="rounded-xl bg-blue-100/50 p-4 text-sm text-blue-700">
+              <p className="font-semibold mb-2">Pro Tips</p>
+              <ul className="list-disc list-inside space-y-1 text-xs opacity-80">
+                <li>Validate after every credential rotation</li>
+                <li>Keep a service account for secure automation</li>
+                <li>Ensure your webhook token matches Meta</li>
               </ul>
-              <div className="rounded-xl border border-indigo-200 bg-indigo-50 p-4 text-sm text-indigo-700">
-                <p className="font-semibold">Deployment Tip</p>
-                <p>
-                  Keep your verify token secret. Rotate it after every security review and share it only with teammates
-                  who manage Meta Developers settings.
-                </p>
-              </div>
             </div>
           </CardContent>
         </Card>
       </div>
+
+      {/* Webhook Configuration */}
+      <Card className="border-none shadow-sm bg-white">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg font-bold text-gray-900">
+            <Webhook className="h-5 w-5 text-gray-400" />
+            Webhook Configuration
+          </CardTitle>
+          <CardDescription>
+            Generate a verify token and use it inside Meta Developers when wiring the webhook
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-8 lg:grid-cols-2">
+          <div className="space-y-6">
+            <div className="flex flex-col gap-4 rounded-xl border border-gray-100 bg-gray-50 p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-gray-500 font-semibold">Webhook Status</p>
+                  <p className="text-lg font-bold text-gray-900 mt-1">
+                    {webhookVerifiedAt ? 'Verified' : 'Awaiting Verification'}
+                  </p>
+                </div>
+                <Badge className={webhookVerifiedAt ? 'bg-green-100 text-green-700 border-none' : 'bg-amber-100 text-amber-700 border-none'}>
+                  {webhookVerifiedAt ? 'Verified' : 'Pending'}
+                </Badge>
+              </div>
+              <p className="text-sm text-gray-600">
+                {webhookVerifiedAt
+                  ? `Verified on ${new Date(webhookVerifiedAt).toLocaleString()}`
+                  : 'Meta must ping your webhook URL with this verify token to complete the setup.'}
+              </p>
+              <Button
+                variant="outline"
+                className="bg-white border-gray-200 w-full"
+                onClick={handleVerifyWebhook}
+                disabled={isVerifyingWebhook || !verifyToken}
+              >
+                {isVerifyingWebhook ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Verifying
+                  </>
+                ) : (
+                  <>
+                    <ShieldCheck className="mr-2 h-4 w-4" />
+                    Test Verification
+                  </>
+                )}
+              </Button>
+              <div className="pt-4 border-t border-gray-200">
+                <p className="mb-2 text-xs font-bold text-gray-900 uppercase tracking-wide">How verification works:</p>
+                <ol className="list-decimal list-inside space-y-2 text-xs text-gray-600">
+                  <li>Go to Meta Developers → WhatsApp → Configuration</li>
+                  <li>Use the Webhook URL shown below</li>
+                  <li>Paste the verify token you generated here</li>
+                  <li>Click “Verify and Save” in Meta. You can also run “Test Verification”.</li>
+                </ol>
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-6">
+            <div className="space-y-2">
+              <Label htmlFor="webhookUrl" className="font-medium text-gray-700">
+                Webhook URL
+              </Label>
+              <div className="flex gap-2">
+                <Input
+                  id="webhookUrl"
+                  value={webhookUrl}
+                  onChange={(e) => setWebhookUrl(e.target.value)}
+                  placeholder="https://your-domain.com/api/webhook"
+                  className="font-mono bg-gray-50 border-gray-200 focus:bg-white transition-all"
+                />
+                <Button
+                  variant="outline"
+                  className="border-gray-200"
+                  onClick={() => copyToClipboard(webhookUrl)}
+                >
+                  <Copy className="h-4 w-4" />
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Deploy behind HTTPS and paste into Meta Developers → WhatsApp → Configuration → Webhooks.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="verifyToken" className="flex items-center gap-2 font-medium text-gray-700">
+                Verify Token
+                <span className="rounded-full bg-gray-100 px-2 py-0.5 text-[10px] uppercase tracking-wide text-gray-500 font-bold">
+                  Required
+                </span>
+              </Label>
+              <div className="flex flex-col gap-3 md:flex-row">
+                <div className="flex flex-1 gap-2">
+                  <Input
+                    id="verifyToken"
+                    value={verifyToken}
+                    onChange={(e) => setVerifyToken(e.target.value)}
+                    placeholder="secure-verify-token"
+                    className="font-mono bg-gray-50 border-gray-200 focus:bg-white transition-all"
+                  />
+                  <Button
+                    variant="outline"
+                    className="border-gray-200"
+                    onClick={() => copyToClipboard(verifyToken)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <Button type="button" className="bg-black text-white hover:bg-gray-800" onClick={handleGenerateToken}>
+                  Generate Token
+                </Button>
+              </div>
+              <p className="text-xs text-gray-500">
+                Enter this token when configuring the webhook inside Meta Developers. We store it securely per tenant
+                once you save.
+              </p>
+            </div>
+
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-6">
+              <div className="flex items-center gap-3 mb-4">
+                <Globe className="h-5 w-5 text-gray-400" />
+                <div>
+                  <p className="text-sm font-bold text-gray-900">Subscribed Events</p>
+                  <p className="text-xs text-gray-500">Enable these topics in Meta:</p>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {['messages', 'message_status', 'message_template_status_update', 'message_echoes'].map((event) => (
+                  <div
+                    key={event}
+                    className="flex items-center justify-between rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-medium text-gray-700"
+                  >
+                    <span className="truncate mr-2" title={event}>{event}</span>
+                    <ShieldCheck className="h-3 w-3 text-green-500 flex-shrink-0" />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 };

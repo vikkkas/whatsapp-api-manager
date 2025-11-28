@@ -23,7 +23,9 @@ import {
   File,
   MessageSquare,
   Edit3,
-  X
+  X,
+  Smile,
+  Mic
 } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import {
@@ -235,15 +237,15 @@ export function MessageThread({ conversationId, onBack }: Props) {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'PENDING':
-        return <Clock className="h-3 w-3 text-gray-400" />;
+        return <Clock className="h-3 w-3 text-white/70" />;
       case 'SENT':
-        return <Check className="h-3 w-3 text-gray-400" />;
+        return <Check className="h-3 w-3 text-white/70" />;
       case 'DELIVERED':
-        return <CheckCheck className="h-3 w-3 text-gray-400" />;
+        return <CheckCheck className="h-3 w-3 text-white/70" />;
       case 'READ':
-        return <CheckCheck className="h-3 w-3 text-blue-400" />;
+        return <CheckCheck className="h-3 w-3 text-blue-200" />;
       case 'FAILED':
-        return <XCircle className="h-3 w-3 text-red-500" />;
+        return <XCircle className="h-3 w-3 text-red-300" />;
       default:
         return null;
     }
@@ -283,7 +285,7 @@ export function MessageThread({ conversationId, onBack }: Props) {
       
       case 'AUDIO':
         return (
-          <div className="flex items-center gap-2 p-2 bg-white bg-opacity-10 rounded-lg">
+          <div className="flex items-center gap-2 p-2 bg-white/10 rounded-lg">
             <div className="flex-1">
               <audio src={message.mediaUrl} controls className="w-full" />
             </div>
@@ -296,7 +298,7 @@ export function MessageThread({ conversationId, onBack }: Props) {
             href={message.mediaUrl} 
             target="_blank" 
             rel="noopener noreferrer"
-            className="flex items-center gap-3 p-3 bg-white bg-opacity-10 rounded-lg hover:bg-opacity-20 transition-all"
+            className="flex items-center gap-3 p-3 bg-white/10 rounded-lg hover:bg-white/20 transition-all"
           >
             <File className="h-8 w-8" />
             <div className="flex-1 min-w-0">
@@ -319,8 +321,8 @@ export function MessageThread({ conversationId, onBack }: Props) {
 
     return (
       <div className="space-y-2">
-        <div className="text-[11px] uppercase tracking-wider font-semibold opacity-70">
-          Template • {message.templateName || 'WhatsApp Template'}
+        <div className="text-[10px] uppercase tracking-wider font-bold opacity-70 mb-1">
+          TEMPLATE: {message.templateName}
         </div>
         {message.text ? (
           <p className="whitespace-pre-wrap break-words leading-relaxed">{message.text}</p>
@@ -328,11 +330,11 @@ export function MessageThread({ conversationId, onBack }: Props) {
           <p className="text-sm italic opacity-75">Template sent</p>
         )}
         {bodyParams.length > 0 && (
-          <div className="rounded-md border border-white/20 bg-white/10 p-2 text-xs">
+          <div className="rounded-md border border-white/20 bg-white/10 p-2 text-xs mt-2">
             {bodyParams.map((param: any, index: number) => (
               <div key={index} className="flex justify-between gap-4">
-                <span className="text-gray-500">Variable {index + 1}</span>
-                <span className="font-medium text-gray-900 dark:text-white">
+                <span className="opacity-70">Variable {index + 1}</span>
+                <span className="font-bold">
                   {param.text || '-'}
                 </span>
               </div>
@@ -353,7 +355,7 @@ export function MessageThread({ conversationId, onBack }: Props) {
       <div key={message.id}>
         {showDateDivider && (
           <div className="flex justify-center my-6">
-            <Badge variant="secondary" className="bg-white text-slate-600 shadow-sm px-3 py-1 text-xs font-medium">
+            <Badge variant="secondary" className="bg-gray-100 text-gray-500 hover:bg-gray-100 shadow-none px-3 py-1 text-xs font-bold border border-gray-200">
               {format(new Date(message.createdAt), 'MMMM d, yyyy')}
             </Badge>
           </div>
@@ -364,19 +366,17 @@ export function MessageThread({ conversationId, onBack }: Props) {
             className={`max-w-[75%] sm:max-w-[65%] ${isOutbound ? 'ml-auto' : 'mr-auto'}`}
           >
             {!isOutbound && (
-              <p className="text-xs font-medium text-gray-500 mb-1">
+              <p className="text-xs font-bold text-gray-400 mb-1 ml-1">
                 {conversation.contactName || message.from}
               </p>
             )}
             <div 
               className={`
-                relative px-4 py-2 rounded-2xl shadow-sm
+                relative px-4 py-3 shadow-sm text-sm
                 ${isOutbound 
-                  ? 'bg-[#e4e0ff] text-slate-900 rounded-br-md border border-[#d5cffb]'
-                  : 'bg-white text-slate-900 rounded-bl-md border border-gray-200'
+                  ? 'bg-blue-600 text-white rounded-2xl rounded-tr-sm'
+                  : 'bg-white text-gray-900 rounded-2xl rounded-tl-sm border border-gray-100'
                 }
-                ${showTail && isOutbound ? 'rounded-br-sm' : ''}
-                ${showTail && !isOutbound ? 'rounded-bl-sm' : ''}
               `}
             >
               {/* Message content */}
@@ -390,7 +390,7 @@ export function MessageThread({ conversationId, onBack }: Props) {
 
               {/* Timestamp and status */}
               <div className={`flex items-center justify-end gap-1 mt-1 ${
-                isOutbound ? 'text-[#6d5ae0]' : 'text-slate-500'
+                isOutbound ? 'text-blue-100' : 'text-gray-400'
               }`}>
                 <span className="text-[10px] font-medium">
                   {format(new Date(message.createdAt), 'HH:mm')}
@@ -410,8 +410,8 @@ export function MessageThread({ conversationId, onBack }: Props) {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-full bg-[#f6f7fb] text-slate-500">
-        <Loader2 className="h-10 w-10 animate-spin text-[#7c6cf0] mb-4" />
+      <div className="flex flex-col items-center justify-center h-full bg-white text-gray-400">
+        <Loader2 className="h-8 w-8 animate-spin mb-4" />
         <p className="font-medium">Loading conversation...</p>
       </div>
     );
@@ -426,35 +426,35 @@ export function MessageThread({ conversationId, onBack }: Props) {
   }
 
   return (
-    <div className="flex flex-col h-full bg-[#f9f9ff]">
+    <div className="flex flex-col h-full bg-white">
       {/* Header */}
-      <div className="flex-none px-4 py-4 bg-gradient-to-r from-[#f6f3ff] to-white text-slate-900 shadow-sm flex items-center justify-between border-b border-slate-100">
-        <div className="flex items-center gap-3 flex-1 min-w-0">
+      <div className="flex-none px-6 py-3 bg-white border-b border-gray-100 flex items-center justify-between z-10">
+        <div className="flex items-center gap-4 flex-1 min-w-0">
           {onBack && (
-            <Button variant="ghost" size="icon" onClick={onBack} className="flex-shrink-0 text-slate-500">
+            <Button variant="ghost" size="icon" onClick={onBack} className="flex-shrink-0 md:hidden text-gray-500">
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
           
-          <Avatar className="h-11 w-11 flex-shrink-0 ring-2 ring-white">
-            <AvatarFallback className="bg-[#ede9ff] text-[#4c47ff] font-semibold">
+          <Avatar className="h-10 w-10 flex-shrink-0 border border-gray-100">
+            <AvatarFallback className="bg-blue-50 text-blue-600 font-bold">
               {conversation.contactName?.[0]?.toUpperCase() || conversation.contactPhone?.[0] || '?'}
             </AvatarFallback>
           </Avatar>
 
-          <div className="flex-1 min-w-0 space-y-1">
+          <div className="flex-1 min-w-0">
             {!isEditingName ? (
               <div className="flex items-center gap-2 min-w-0">
-                <h2 className="font-semibold text-slate-900 truncate">
+                <h2 className="font-bold text-gray-900 truncate text-lg">
                   {conversation.contactName || 'Unknown'}
                 </h2>
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 text-slate-500 hover:text-slate-900"
+                  className="h-6 w-6 text-gray-400 hover:text-gray-900"
                   onClick={() => setIsEditingName(true)}
                 >
-                  <Edit3 className="h-4 w-4" />
+                  <Edit3 className="h-3 w-3" />
                 </Button>
               </div>
             ) : (
@@ -462,56 +462,66 @@ export function MessageThread({ conversationId, onBack }: Props) {
                 <Input
                   value={contactNameInput}
                   onChange={(e) => setContactNameInput(e.target.value)}
-                  className="h-9"
+                  className="h-8 text-sm"
+                  autoFocus
                 />
                 <Button
                   size="icon"
-                  variant="secondary"
+                  className="h-8 w-8 bg-black text-white hover:bg-gray-800"
                   disabled={updatingName}
                   onClick={handleUpdateContactName}
-                  className="bg-[#4c47ff] text-white hover:bg-[#3c3add]"
                 >
-                  <Check className="h-4 w-4" />
+                  <Check className="h-3 w-3" />
                 </Button>
                 <Button
                   size="icon"
                   variant="ghost"
+                  className="h-8 w-8"
                   onClick={() => {
                     setIsEditingName(false);
                     setContactNameInput(conversation.contactName || '');
                   }}
                 >
-                  <X className="h-4 w-4" />
+                  <X className="h-3 w-3" />
                 </Button>
               </div>
             )}
-            <div className="flex items-center gap-2 text-sm text-slate-500">
+            <div className="flex items-center gap-2 text-xs font-medium text-gray-500">
               <Phone className="h-3 w-3" />
               <span className="truncate">{conversation.contactPhone}</span>
+              {isConnected && (
+                <>
+                  <span className="w-1 h-1 rounded-full bg-gray-300" />
+                  <span className="text-green-600 flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                    Online
+                  </span>
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2 flex-shrink-0">
-          {isConnected && (
-            <Badge variant="outline" className="text-xs bg-emerald-50 text-emerald-600 border-emerald-100">
-              <div className="w-1.5 h-1.5 bg-emerald-500 rounded-full mr-1.5 animate-pulse" />
-              Live
-            </Badge>
-          )}
-
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <Button variant="ghost" size="icon" className="text-gray-400 hover:text-black">
+            <Phone className="h-5 w-5" />
+          </Button>
+          <Button variant="ghost" size="icon" className="text-gray-400 hover:text-black">
+            <Video className="h-5 w-5" />
+          </Button>
+          
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="text-slate-500 hover:text-slate-900">
+              <Button variant="ghost" size="icon" className="text-gray-400 hover:text-black">
                 <MoreVertical className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
-              <DropdownMenuItem onClick={handleResolve} className="cursor-pointer">
+              <DropdownMenuItem onClick={handleResolve} className="cursor-pointer font-medium">
                 <CheckCheck className="h-4 w-4 mr-2" />
                 Mark as Resolved
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={handleArchive} className="text-red-600 cursor-pointer">
+              <DropdownMenuItem onClick={handleArchive} className="text-red-600 cursor-pointer font-medium">
                 <XCircle className="h-4 w-4 mr-2" />
                 Archive Conversation
               </DropdownMenuItem>
@@ -522,19 +532,17 @@ export function MessageThread({ conversationId, onBack }: Props) {
 
       {/* Messages Area */}
       <div 
-        className="flex-1 min-h-0 overflow-y-auto py-6 px-2 sm:px-6 scroll-smooth"
-        style={{
-          backgroundImage:
-            "linear-gradient(180deg, rgba(247,244,255,0.7) 0%, rgba(249,249,255,0.4) 35%, #f9f9ff 100%)",
-        }}
+        className="flex-1 min-h-0 overflow-y-auto py-6 px-2 sm:px-6 scroll-smooth bg-gray-50/30"
       >
         {messages.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-full text-gray-500 px-4">
-            <div className="bg-white p-8 rounded-3xl shadow-sm text-center max-w-md border border-slate-100">
-              <MessageSquare className="h-16 w-16 mx-auto mb-4 text-slate-300" />
-              <p className="text-lg font-medium text-slate-700 mb-2">No messages yet</p>
-              <p className="text-sm text-slate-500">
-                Start the conversation by sending a message below
+            <div className="bg-white p-8 rounded-2xl shadow-sm text-center max-w-md border border-gray-100">
+              <div className="w-16 h-16 bg-blue-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                <MessageSquare className="h-8 w-8 text-blue-500" />
+              </div>
+              <p className="text-xl font-bold text-gray-900 mb-2">No messages yet</p>
+              <p className="text-sm text-gray-500">
+                Start the conversation by sending a message below.
               </p>
             </div>
           </div>
@@ -547,11 +555,11 @@ export function MessageThread({ conversationId, onBack }: Props) {
             {/* Typing indicator */}
             {isTyping && (
               <div className="flex justify-start mb-4 px-4">
-                <div className="bg-white rounded-2xl rounded-bl-sm px-4 py-3 shadow-sm border border-gray-200">
+                <div className="bg-white rounded-2xl rounded-tl-sm px-4 py-3 shadow-sm border border-gray-100">
                   <div className="flex gap-1">
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
-                    <div className="w-2 h-2 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
+                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '0ms' }}></div>
+                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '150ms' }}></div>
+                    <div className="w-1.5 h-1.5 bg-gray-400 rounded-full animate-bounce" style={{ animationDelay: '300ms' }}></div>
                   </div>
                 </div>
               </div>
@@ -563,8 +571,27 @@ export function MessageThread({ conversationId, onBack }: Props) {
       </div>
 
       {/* Input Area */}
-      <div className="flex-none px-4 py-4 bg-white border-t border-slate-100">
-        <form onSubmit={handleSendMessage} className="flex items-end gap-2">
+      <div className="flex-none px-6 py-4 bg-white border-t border-gray-100">
+        <form onSubmit={handleSendMessage} className="flex items-end gap-3 max-w-4xl mx-auto w-full">
+          <div className="flex items-center gap-2 pb-3">
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="text-gray-400 hover:text-black hover:bg-gray-100 rounded-full"
+            >
+              <Paperclip className="h-5 w-5" />
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="text-gray-400 hover:text-black hover:bg-gray-100 rounded-full"
+            >
+              <ImageIcon className="h-5 w-5" />
+            </Button>
+          </div>
+
           <div className="flex-1 relative">
             <Input
               ref={inputRef}
@@ -577,27 +604,27 @@ export function MessageThread({ conversationId, onBack }: Props) {
               }}
               onKeyPress={handleKeyPress}
               disabled={isSending}
-              className="pr-10 py-6 rounded-2xl border-slate-200 bg-slate-50 focus:ring-2 focus:ring-[#4c47ff] focus:border-transparent"
+              className="pr-12 py-6 rounded-xl border-gray-200 bg-gray-50 focus:bg-white focus:ring-2 focus:ring-black focus:border-transparent transition-all font-medium"
             />
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
+              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-400 hover:text-black"
             >
-              <Paperclip className="h-5 w-5" />
+              <Smile className="h-5 w-5" />
             </Button>
           </div>
           
           <Button 
             type="submit" 
             disabled={!newMessage.trim() || isSending}
-            className="rounded-2xl h-12 w-12 p-0 bg-[#4c47ff] hover:bg-[#3c3add] text-white shadow-lg disabled:opacity-50"
+            className="rounded-xl h-12 w-12 p-0 bg-black hover:bg-gray-800 text-white shadow-md disabled:opacity-50 disabled:shadow-none transition-all"
           >
             {isSending ? (
               <Loader2 className="h-5 w-5 animate-spin" />
             ) : (
-              <Send className="h-5 w-5" />
+              <Send className="h-5 w-5 ml-0.5" />
             )}
           </Button>
         </form>

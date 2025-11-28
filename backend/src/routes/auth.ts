@@ -16,7 +16,7 @@ const registerSchema = z.object({
   password: z.string().min(8),
   name: z.string().min(2),
   tenantName: z.string().min(2),
-  tenantSlug: z.string().min(2).regex(/^[a-z0-9-]+$/),
+  tenantSlug: z.string().min(2).regex(/^[a-z0-9-]+$/).optional(),
 });
 
 const loginSchema = z.object({
@@ -46,6 +46,14 @@ function generateRefreshToken(payload: JWTPayload): string {
   } as jwt.SignOptions);
 }
 
+// Helper to generate slug from name
+function generateSlug(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '');
+}
+
 // ============================================
 // ROUTES
 // ============================================
@@ -70,16 +78,17 @@ router.post('/register', async (req: Request, res: Response) => {
       });
     }
 
-    // Check if tenant slug is taken
-    const existingTenant = await prisma.tenant.findUnique({
-      where: { slug: data.tenantSlug },
+    // Generate slug if not provided
+    let tenantSlug = data.tenantSlug || generateSlug(data.tenantName);
+    
+    // Ensure slug is unique by appending random string if needed
+    let slugExists = await prisma.tenant.findUnique({
+      where: { slug: tenantSlug },
     });
-
-    if (existingTenant) {
-      return res.status(400).json({
-        success: false,
-        error: 'Tenant slug already taken',
-      });
+    
+    if (slugExists) {
+      const randomSuffix = Math.random().toString(36).substring(2, 8);
+      tenantSlug = `${tenantSlug}-${randomSuffix}`;
     }
 
     // Hash password
@@ -91,7 +100,7 @@ router.post('/register', async (req: Request, res: Response) => {
       const tenant = await tx.tenant.create({
         data: {
           name: data.tenantName,
-          slug: data.tenantSlug,
+          slug: tenantSlug,
           status: 'TRIAL',
           plan: 'free',
         },
