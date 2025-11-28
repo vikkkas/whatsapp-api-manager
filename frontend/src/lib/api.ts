@@ -33,11 +33,13 @@ export interface Message {
   status: 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
   from: string;
   to: string;
-  type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT';
+  type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT' | 'TEMPLATE';
   text?: string;
   mediaUrl?: string;
   caption?: string;
   filename?: string;
+  templateName?: string;
+  templateParams?: unknown;
   createdAt: string;
   conversation?: {
     id: string;
@@ -166,10 +168,21 @@ export const authAPI = {
     }
   },
 
+  getCurrentTenant: () => {
+    const tenantStr = localStorage.getItem('tenant');
+    if (!tenantStr) return null;
+    try {
+      return JSON.parse(tenantStr);
+    } catch {
+      return null;
+    }
+  },
+
   logout: () => {
     localStorage.removeItem('authToken');
     localStorage.removeItem('refreshToken');
     localStorage.removeItem('user');
+    localStorage.removeItem('tenant');
     window.location.href = '/login';
   },
 };
@@ -188,11 +201,14 @@ export const messageAPI = {
   send: async (data: {
     phoneNumberId: string;
     to: string;
-    type: 'text' | 'image' | 'video' | 'audio' | 'document';
+    type: 'text' | 'image' | 'video' | 'audio' | 'document' | 'template';
     text?: string;
     mediaUrl?: string;
     caption?: string;
     filename?: string;
+    templateName?: string;
+    languageCode?: string;
+    templateComponents?: unknown[];
   }) => {
     return apiRequest<Message>('/api/messages', {
       method: 'POST',
@@ -219,7 +235,7 @@ export const conversationAPI = {
     return apiRequest<Conversation>(`/api/conversations/${id}`);
   },
 
-  update: async (id: string, data: { status?: string; assignedTo?: string | null; tags?: string[] }) => {
+  update: async (id: string, data: { status?: string; assignedTo?: string | null; tags?: string[]; contactName?: string }) => {
     return apiRequest<Conversation>(`/api/conversations/${id}`, {
       method: 'PATCH',
       body: JSON.stringify(data),
@@ -241,6 +257,12 @@ export const conversationAPI = {
 export const templateAPI = {
   getAll: async () => {
     return apiRequest('/api/templates');
+  },
+
+  sync: async () => {
+    return apiRequest('/api/templates/sync', {
+      method: 'POST',
+    });
   },
 
   get: async (id: string) => {
@@ -284,6 +306,29 @@ export const templateAPI = {
   delete: async (id: string) => {
     return apiRequest(`/api/templates/${id}`, {
       method: 'DELETE',
+    });
+  },
+};
+
+export const templateMessageAPI = {
+  send: async (data: {
+    phoneNumberId: string;
+    to: string;
+    templateId?: string;
+    templateName?: string;
+    languageCode?: string;
+    templateComponents?: unknown[];
+  }) => {
+    return apiRequest('/api/messages', {
+      method: 'POST',
+      body: JSON.stringify({
+        phoneNumberId: data.phoneNumberId,
+        to: data.to,
+        type: 'template',
+        templateName: data.templateName || data.templateId,
+        languageCode: data.languageCode,
+        templateComponents: data.templateComponents,
+      }),
     });
   },
 };
@@ -409,6 +454,27 @@ export const settingsAPI = {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
+  },
+
+  verifyWebhook: async (verifyToken: string) => {
+    const challenge = `verify-${Date.now()}`;
+    const params = new URLSearchParams({
+      'hub.mode': 'subscribe',
+      'hub.verify_token': verifyToken,
+      'hub.challenge': challenge,
+    });
+
+    const response = await fetch(`${API_BASE_URL}/api/webhook?${params.toString()}`);
+    const text = await response.text();
+
+    if (!response.ok) {
+      throw new Error('Verification request failed');
+    }
+
+    return {
+      success: text === challenge,
+      challenge: text,
+    };
   },
 };
 

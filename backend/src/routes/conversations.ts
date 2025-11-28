@@ -4,6 +4,7 @@ import prisma from '../config/prisma.js';
 import { authenticate } from '../middleware/auth.js';
 import { enforceTenantIsolation } from '../middleware/tenant.js';
 import { log } from '../utils/logger.js';
+import { broadcastConversationUpdate } from '../services/websocket.js';
 
 const router = express.Router();
 
@@ -24,6 +25,7 @@ const updateConversationSchema = z.object({
   status: z.enum(['OPEN', 'RESOLVED', 'ARCHIVED']).optional(),
   assignedTo: z.string().uuid().nullable().optional(),
   tags: z.array(z.string()).optional(),
+  contactName: z.string().min(1).max(120).optional(),
 });
 
 /**
@@ -174,6 +176,8 @@ router.patch('/:id', async (req: Request, res: Response) => {
     const { id } = req.params;
     const tenantId = req.user!.tenantId;
     const data = updateConversationSchema.parse(req.body);
+    const { contactName, ...rest } = data;
+    const formattedContactName = contactName?.trim();
 
     const conversation = await prisma.conversation.findFirst({
       where: { id, tenantId },
@@ -183,10 +187,10 @@ router.patch('/:id', async (req: Request, res: Response) => {
       return res.status(404).json({ error: 'Conversation not found' });
     }
 
-    if (data.assignedTo) {
+    if (rest.assignedTo) {
       const agent = await prisma.agent.findFirst({
         where: {
-          id: data.assignedTo,
+          id: rest.assignedTo,
           tenantId,
         },
       });
@@ -196,9 +200,15 @@ router.patch('/:id', async (req: Request, res: Response) => {
       }
     }
 
+    const updateData: any = { ...rest };
+
+    if (formattedContactName !== undefined) {
+      updateData.contactName = formattedContactName;
+    }
+
     const updated = await prisma.conversation.update({
       where: { id },
-      data,
+      data: updateData,
       include: {
         assignedAgent: {
           select: {
@@ -209,6 +219,15 @@ router.patch('/:id', async (req: Request, res: Response) => {
         },
       },
     });
+
+    if (formattedContactName && conversation.contactId) {
+      await prisma.contact.update({
+        where: { id: conversation.contactId },
+        data: { name: formattedContactName },
+      });
+    }
+
+    broadcastConversationUpdate(id, updated);
 
     res.json(updated);
   } catch (error: any) {

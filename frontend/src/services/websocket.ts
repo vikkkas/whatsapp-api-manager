@@ -6,7 +6,9 @@ const SOCKET_URL = import.meta.env.VITE_BACKEND_URL || 'http://localhost:3000';
 interface WebSocketEvents {
   'message:new': (message: any) => void;
   'message:status': (data: { messageId: string; status: string }) => void;
+  'conversation:new': (conversation: any) => void;
   'conversation:updated': (conversation: any) => void;
+  'notification:new': (data: { type: string; conversationId: string; message: any }) => void;
   'typing:start': (data: { conversationId: string; userId: string; userName: string }) => void;
   'typing:stop': (data: { conversationId: string; userId: string }) => void;
   'user:online': (data: { userId: string }) => void;
@@ -15,6 +17,7 @@ interface WebSocketEvents {
   'disconnect': () => void;
   'error': (error: Error) => void;
 }
+
 
 class WebSocketService {
   private socket: Socket | null = null;
@@ -88,9 +91,20 @@ class WebSocketService {
     });
 
     // Conversation events
+    this.socket.on('conversation:new', (conversation) => {
+      console.log('🆕 New conversation received:', conversation);
+      this.emit('conversation:new', conversation);
+    });
+
     this.socket.on('conversation:updated', (conversation) => {
       console.log('💬 Conversation updated:', conversation);
       this.emit('conversation:updated', conversation);
+    });
+
+    // Notification events
+    this.socket.on('notification:new', (data) => {
+      console.log('🔔 New notification:', data);
+      this.emit('notification:new', data);
     });
 
     // Typing indicators
@@ -121,10 +135,13 @@ class WebSocketService {
 
   disconnect(): void {
     if (this.socket) {
+      // Remove all event listeners
+      this.eventHandlers.clear();
+      
       this.socket.disconnect();
       this.socket = null;
       this.isConnecting = false;
-      console.log('WebSocket manually disconnected');
+      console.log('WebSocket manually disconnected and listeners cleared');
     }
   }
 

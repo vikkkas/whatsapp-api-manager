@@ -32,17 +32,20 @@ import {
   XCircle,
   Loader2,
   Send,
-  FileText
+  FileText,
+  RefreshCw
 } from 'lucide-react';
-import { templateAPI } from '../lib/api';
+import { templateAPI, templateMessageAPI, settingsAPI } from '../lib/api';
 import { toast } from 'sonner';
 
 interface Template {
   id: string;
   name: string;
+  metaName?: string;
   category: string;
   language: string;
-  status: 'APPROVED' | 'PENDING' | 'REJECTED';
+  status: 'APPROVED' | 'PENDING' | 'REJECTED' | 'DISABLED';
+  rejectionReason?: string | null;
   components: {
     type: string;
     format?: string;
@@ -64,6 +67,13 @@ const TemplateManagement = () => {
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [isSendDialogOpen, setIsSendDialogOpen] = useState(false);
+  const [sendPhoneNumber, setSendPhoneNumber] = useState('');
+  const [sendLanguage, setSendLanguage] = useState('en_US');
+  const [sendParams, setSendParams] = useState<Record<number, string>>({});
+  const [isSendingTemplate, setIsSendingTemplate] = useState(false);
+  const [phoneNumberId, setPhoneNumberId] = useState<string>('');
   const [formData, setFormData] = useState({
     name: '',
     category: 'MARKETING',
@@ -73,18 +83,38 @@ const TemplateManagement = () => {
     footerText: '',
     buttons: [] as { type: string; text: string }[],
   });
+  const [hasAutoSynced, setHasAutoSynced] = useState(false);
 
   useEffect(() => {
-    fetchTemplates();
+    fetchTemplates(true);
+    (async () => {
+      try {
+        const settings = await settingsAPI.get();
+        const templateCredential = settings.settings?.waba?.phoneNumberId;
+        if (templateCredential) {
+          setPhoneNumberId(templateCredential);
+        }
+      } catch (error) {
+        toast.error('Failed to fetch settings');
+      }
+    })();
   }, []);
 
   useEffect(() => {
     filterTemplates();
   }, [searchQuery, categoryFilter, statusFilter, templates]);
 
-  const fetchTemplates = async () => {
+  const fetchTemplates = async (autoSync: boolean = false) => {
     try {
       setIsLoading(true);
+      if (autoSync && !hasAutoSynced) {
+        try {
+          await templateAPI.sync();
+          setHasAutoSynced(true);
+        } catch (error) {
+          toast.error('Failed to sync with Meta. Showing cached templates.');
+        }
+      }
       const response = await templateAPI.getAll();
       setTemplates(response.templates || []);
     } catch (error) {
@@ -112,6 +142,19 @@ const TemplateManagement = () => {
     }
 
     setFilteredTemplates(filtered);
+  };
+
+  const handleSyncWithMeta = async () => {
+    try {
+      setIsSyncing(true);
+      await templateAPI.sync();
+      toast.success('Templates synced with Meta');
+      fetchTemplates();
+    } catch (error) {
+      toast.error('Failed to sync templates');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleCreate = () => {
@@ -156,6 +199,14 @@ const TemplateManagement = () => {
   const handlePreview = (template: Template) => {
     setSelectedTemplate(template);
     setIsPreviewOpen(true);
+  };
+
+  const openSendDialog = (template: Template) => {
+    setSelectedTemplate(template);
+    setSendPhoneNumber('');
+    setSendLanguage(template.language);
+    setSendParams({});
+    setIsSendDialogOpen(true);
   };
 
   const confirmDelete = async () => {
@@ -250,6 +301,8 @@ const TemplateManagement = () => {
         return <Badge className="bg-yellow-500"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
       case 'REJECTED':
         return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
+      case 'DISABLED':
+        return <Badge className="bg-gray-400">Disabled</Badge>;
       default:
         return null;
     }
@@ -269,6 +322,9 @@ const TemplateManagement = () => {
 
     return (
       <div className="border rounded-lg p-4 bg-white max-w-md mx-auto">
+        <div className="mb-3 text-xs uppercase tracking-wide text-gray-400">
+          Meta Name: {template.metaName || 'N/A'}
+        </div>
         {headerComponent && (
           <div className="font-semibold text-lg mb-2">
             {headerComponent.text}
@@ -282,6 +338,11 @@ const TemplateManagement = () => {
         {footerComponent && (
           <div className="text-xs text-gray-500 mt-2">
             {footerComponent.text}
+          </div>
+        )}
+        {template.rejectionReason && (
+          <div className="mt-3 rounded border border-red-100 bg-red-50 p-3 text-xs text-red-600">
+            Rejection reason: {template.rejectionReason}
           </div>
         )}
         {buttonsComponent && buttonsComponent.buttons && (
@@ -300,17 +361,92 @@ const TemplateManagement = () => {
     );
   };
 
+  const handleSendTemplate = async () => {
+    if (!selectedTemplate) return;
+    if (!phoneNumberId) {
+      toast.error('No sending phone number configured. Update Settings first.');
+      return;
+    }
+    const normalizedPhone = sendPhoneNumber.trim();
+    if (!normalizedPhone) {
+      toast.error('Enter a destination phone number');
+      return;
+    }
+
+    setIsSendingTemplate(true);
+    try {
+      const templateComponents: Array<{
+        type: 'header' | 'body' | 'button';
+        parameters: Array<{ type: string; text: string }>;
+      }> = [];
+
+      const bodyText = selectedTemplate.components.find((c) => c.type === 'BODY')?.text || '';
+      const bodyVariables = extractVariables(bodyText);
+      if (bodyVariables.length > 0) {
+        templateComponents.push({
+          type: 'body',
+          parameters: bodyVariables.map((index) => ({
+            type: 'text',
+            text: sendParams[Number(index)] || '',
+          })),
+        });
+      }
+
+      const headerText = selectedTemplate.components.find((c) => c.type === 'HEADER')?.text || '';
+      const headerVariables = extractVariables(headerText);
+      if (headerVariables.length > 0) {
+        templateComponents.push({
+          type: 'header',
+          parameters: headerVariables.map((index) => ({
+            type: 'text',
+            text: sendParams[Number(index)] || '',
+          })),
+        });
+      }
+
+      await templateMessageAPI.send({
+        phoneNumberId,
+        to: normalizedPhone,
+        templateName: selectedTemplate.metaName || selectedTemplate.name,
+        languageCode: sendLanguage || selectedTemplate.language,
+        templateComponents,
+      });
+
+      toast.success('Template message sent');
+      setIsSendDialogOpen(false);
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to send template');
+    } finally {
+      setIsSendingTemplate(false);
+    }
+  };
+
   return (
     <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
         <div>
           <h1 className="text-3xl font-bold">Template Management</h1>
-          <p className="text-gray-600 mt-1">Create and manage WhatsApp message templates</p>
+          <p className="text-gray-600 mt-1">Create, sync, and monitor your WhatsApp Business templates</p>
         </div>
-        <Button onClick={handleCreate}>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Template
-        </Button>
+        <div className="flex flex-wrap gap-3">
+          <Button variant="outline" onClick={handleSyncWithMeta} disabled={isSyncing}>
+            {isSyncing ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                Syncing
+              </>
+            ) : (
+              <>
+                <RefreshCw className="h-4 w-4 mr-2" />
+                Sync with Meta
+              </>
+            )}
+          </Button>
+          <Button onClick={handleCreate}>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Template
+          </Button>
+        </div>
       </div>
 
       {/* Filters */}
@@ -346,6 +482,7 @@ const TemplateManagement = () => {
                 <SelectItem value="APPROVED">Approved</SelectItem>
                 <SelectItem value="PENDING">Pending</SelectItem>
                 <SelectItem value="REJECTED">Rejected</SelectItem>
+                <SelectItem value="DISABLED">Disabled</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -387,10 +524,21 @@ const TemplateManagement = () => {
                   <div className="text-sm text-gray-600 line-clamp-3">
                     {template.components.find(c => c.type === 'BODY')?.text || 'No content'}
                   </div>
+                  {template.rejectionReason && (
+                    <div className="rounded border border-red-100 bg-red-50 p-2 text-xs text-red-600">
+                      Rejection reason: {template.rejectionReason}
+                    </div>
+                  )}
+                  <div className="text-xs text-gray-400">
+                    Meta ID: {template.metaName || 'N/A'}
+                  </div>
                   <div className="flex gap-2">
                     <Button size="sm" variant="outline" onClick={() => handlePreview(template)} className="flex-1">
                       <Eye className="h-4 w-4 mr-1" />
                       Preview
+                    </Button>
+                    <Button size="sm" variant="outline" onClick={() => openSendDialog(template)}>
+                      <Send className="h-4 w-4" />
                     </Button>
                     <Button size="sm" variant="outline" onClick={() => handleEdit(template)}>
                       <Edit className="h-4 w-4" />
@@ -542,6 +690,76 @@ const TemplateManagement = () => {
             </DialogDescription>
           </DialogHeader>
           {selectedTemplate && renderTemplatePreview(selectedTemplate)}
+        </DialogContent>
+      </Dialog>
+
+      {/* Send Template Dialog */}
+      <Dialog open={isSendDialogOpen} onOpenChange={setIsSendDialogOpen}>
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>Send Template Message</DialogTitle>
+            <DialogDescription>
+              Send {selectedTemplate?.name} to a new phone number
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <Label>Phone Number</Label>
+              <Input
+                placeholder="e.g. +15551234567"
+                value={sendPhoneNumber}
+                onChange={(e) => setSendPhoneNumber(e.target.value)}
+              />
+            </div>
+            <div>
+              <Label>Language Code</Label>
+              <Input
+                placeholder="en_US"
+                value={sendLanguage}
+                onChange={(e) => setSendLanguage(e.target.value)}
+              />
+            </div>
+            {selectedTemplate && (
+              <div className="space-y-2">
+                <Label>Template Variables</Label>
+                {extractVariables(selectedTemplate.components.find((c) => c.type === 'BODY')?.text || '').length === 0 ? (
+                  <p className="text-xs text-gray-500">No variables required for this template.</p>
+                ) : (
+                  extractVariables(
+                    selectedTemplate.components.find((c) => c.type === 'BODY')?.text || ''
+                  ).map((variable) => (
+                    <div key={variable} className="flex items-center gap-2">
+                      <span className="text-sm text-gray-600">{'{{'}{variable}{'}}'}:</span>
+                      <Input
+                        value={sendParams[Number(variable)] || ''}
+                        onChange={(e) =>
+                          setSendParams((prev) => ({ ...prev, [Number(variable)]: e.target.value }))
+                        }
+                      />
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsSendDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleSendTemplate} disabled={isSendingTemplate}>
+              {isSendingTemplate ? (
+                <>
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  Sending
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4 mr-2" />
+                  Send
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 

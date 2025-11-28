@@ -36,15 +36,29 @@ export const useConversationStore = create<ConversationState>((set) => ({
   setConversations: (conversations) => set({ conversations }),
 
   addConversation: (conversation) =>
-    set((state) => ({
-      conversations: [conversation, ...state.conversations],
-    })),
+    set((state) => {
+      // Check if conversation already exists
+      const exists = state.conversations.some(c => c.id === conversation.id);
+      if (exists) {
+        // Update existing conversation instead
+        return {
+          conversations: state.conversations
+            .map((conv) => conv.id === conversation.id ? { ...conv, ...conversation } : conv)
+            .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()),
+        };
+      }
+      // Add new conversation and sort by lastMessageAt
+      return {
+        conversations: [conversation, ...state.conversations]
+          .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()),
+      };
+    }),
 
   updateConversation: (id, updates) =>
     set((state) => ({
-      conversations: state.conversations.map((conv) =>
-        conv.id === id ? { ...conv, ...updates } : conv
-      ),
+      conversations: state.conversations
+        .map((conv) => conv.id === id ? { ...conv, ...updates } : conv)
+        .sort((a, b) => new Date(b.lastMessageAt).getTime() - new Date(a.lastMessageAt).getTime()),
     })),
 
   removeConversation: (id) =>

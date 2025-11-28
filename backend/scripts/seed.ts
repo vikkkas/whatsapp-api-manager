@@ -127,26 +127,38 @@ async function seed() {
         {
           tenantId: tenant.id,
           name: 'greeting',
+          displayName: 'Greeting',
           category: 'MARKETING',
           language: 'en',
           bodyText: 'Hello {{1}}! Welcome to our service.',
           status: 'APPROVED',
+          components: [
+            { type: 'BODY', text: 'Hello {{1}}! Welcome to our service.' }
+          ],
         },
         {
           tenantId: tenant.id,
           name: 'order_confirmation',
+          displayName: 'Order Confirmation',
           category: 'UTILITY',
           language: 'en',
           bodyText: 'Your order {{1}} has been confirmed. Thank you!',
           status: 'APPROVED',
+          components: [
+            { type: 'BODY', text: 'Your order {{1}} has been confirmed. Thank you!' }
+          ],
         },
         {
           tenantId: tenant.id,
           name: 'support_followup',
+          displayName: 'Support Follow Up',
           category: 'MARKETING',
           language: 'en',
           bodyText: 'Hi {{1}}, we wanted to follow up on your recent inquiry.',
           status: 'APPROVED',
+          components: [
+            { type: 'BODY', text: 'Hi {{1}}, we wanted to follow up on your recent inquiry.' }
+          ],
         },
       ],
     });

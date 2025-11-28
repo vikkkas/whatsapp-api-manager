@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Send, CheckCircle2, XCircle, Loader2, Phone } from "lucide-react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
-import { messageAPI } from "@/lib/api";
+import { messageAPI, settingsAPI } from "@/lib/api";
 import { formatPhoneNumberDisplay, getCountryFlag, normalizePhoneNumber } from "@/lib/phoneUtils";
 
 interface SentMessageDetails {
@@ -21,6 +21,19 @@ export default function SendMessage() {
   const [message, setMessage] = useState("");
   const [apiStatus, setApiStatus] = useState<"idle" | "loading" | "success" | "error">("idle");
   const [sentMessageDetails, setSentMessageDetails] = useState<SentMessageDetails | null>(null);
+  const [phoneNumberId, setPhoneNumberId] = useState("");
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      try {
+        const response = await settingsAPI.get();
+        setPhoneNumberId(response.settings?.waba?.phoneNumberId || "");
+      } catch (error) {
+        console.error("Failed to load settings", error);
+      }
+    };
+    fetchSettings();
+  }, []);
 
   const formatPhoneNumber = (phone: string) => {
     return normalizePhoneNumber(phone);
@@ -60,8 +73,16 @@ export default function SendMessage() {
     setSentMessageDetails(null);
 
     try {
+      if (!phoneNumberId) {
+        throw new Error("Configure your WhatsApp phone number in Settings first.");
+      }
       const formattedPhone = formatPhoneNumber(phoneNumber);
-      const response = await messageAPI.send(formattedPhone, message.trim());
+      const response = await messageAPI.send({
+        phoneNumberId,
+        to: formattedPhone,
+        type: 'text',
+        text: message.trim(),
+      });
 
       setApiStatus("success");
       setSentMessageDetails({

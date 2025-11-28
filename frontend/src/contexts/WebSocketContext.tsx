@@ -32,6 +32,11 @@ export const WebSocketProvider: React.FC<Props> = ({ children }) => {
   const { addConversation, updateConversation, addTypingUser, removeTypingUser, incrementUnreadCount, selectedConversationId } = useConversationStore();
   const { addMessage, updateMessage } = useMessageStore();
   const [isConnected, setIsConnected] = React.useState(false);
+  const selectedConversationRef = React.useRef<string | null>(null);
+
+  React.useEffect(() => {
+    selectedConversationRef.current = selectedConversationId;
+  }, [selectedConversationId]);
 
   useEffect(() => {
     if (isAuthenticated && token) {
@@ -41,41 +46,82 @@ export const WebSocketProvider: React.FC<Props> = ({ children }) => {
       // Setup event listeners
       websocketService.on('connect', () => {
         setIsConnected(true);
+        console.log('✅ WebSocket connected');
       });
 
       websocketService.on('disconnect', () => {
         setIsConnected(false);
+        console.log('❌ WebSocket disconnected');
       });
 
       // Handle new messages
       websocketService.on('message:new', (message) => {
+        console.log('📨 New message received:', message);
+        
         // Add message to store
         addMessage(message.conversationId, message);
 
-        // Increment unread count if conversation is not selected
-        if (message.conversationId !== selectedConversationId && message.direction === 'INBOUND') {
-          incrementUnreadCount(message.conversationId);
-        }
-
-        // Show notification for inbound messages
-        if (message.direction === 'INBOUND') {
-          toast.success(`New message from ${message.from}`);
-        }
+        // Note: Unread count and notifications are handled by notification:new event
+        // to avoid duplicates since backend sends both events
       });
 
       // Handle message status updates
       websocketService.on('message:status', ({ messageId, status }) => {
-        // Find which conversation this message belongs to and update it
-        // This is a limitation - we'd need to track message->conversation mapping
-        // For now, we'll update in the current conversation
-        if (selectedConversationId) {
-          updateMessage(selectedConversationId, messageId, { status: status as any });
+        const activeConversation = selectedConversationRef.current;
+        if (activeConversation) {
+          updateMessage(activeConversation, messageId, { status: status as any });
+        }
+      });
+
+      // Handle new conversations
+      websocketService.on('conversation:new', (conversation) => {
+        console.log('🆕 New conversation received:', conversation);
+        addConversation(conversation);
+        
+        // Request notification permission if not already granted
+        if ('Notification' in window && Notification.permission === 'default') {
+          Notification.requestPermission();
         }
       });
 
       // Handle conversation updates
       websocketService.on('conversation:updated', (conversation) => {
+        console.log('💬 Conversation updated:', conversation);
         updateConversation(conversation.id, conversation);
+      });
+
+      // Handle notification events (from backend pub/sub)
+      websocketService.on('notification:new', ({ type, conversationId, message }) => {
+        console.log('🔔 Notification received:', { type, conversationId, message });
+        
+        if (type === 'message' && message.direction === 'INBOUND') {
+          // Add message to store if not already added
+          addMessage(conversationId, message);
+          
+          // Increment unread count if conversation is not selected
+          if (conversationId !== selectedConversationRef.current) {
+            incrementUnreadCount(conversationId);
+          }
+          
+          // Get conversation for display name
+          const conversations = useConversationStore.getState().conversations;
+          const conversation = conversations.find(c => c.id === conversationId);
+          const displayName = conversation?.contactName || message.from;
+          
+          // Show toast notification
+          toast.info(`💬 ${displayName}`, {
+            description: message.text?.substring(0, 50) || 'New message',
+          });
+          
+          // Browser notification
+          if ('Notification' in window && Notification.permission === 'granted') {
+            new Notification(`New message from ${displayName}`, {
+              body: message.text?.substring(0, 100) || 'New message',
+              icon: '/whatsapp-icon.png',
+              tag: conversationId,
+            });
+          }
+        }
       });
 
       // Handle typing indicators
@@ -89,18 +135,19 @@ export const WebSocketProvider: React.FC<Props> = ({ children }) => {
 
       // Cleanup on unmount
       return () => {
+        console.log('🧹 Cleaning up WebSocket listeners');
         websocketService.disconnect();
       };
     }
   }, [isAuthenticated, token]);
 
-  const value: WebSocketContextType = {
+  const value: WebSocketContextType = React.useMemo(() => ({
     isConnected,
     joinConversation: (id) => websocketService.joinConversation(id),
     leaveConversation: (id) => websocketService.leaveConversation(id),
     startTyping: (id) => websocketService.startTyping(id),
     stopTyping: (id) => websocketService.stopTyping(id),
-  };
+  }), [isConnected]);
 
   return (
     <WebSocketContext.Provider value={value}>

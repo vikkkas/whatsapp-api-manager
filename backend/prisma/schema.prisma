@@ -35,6 +35,9 @@ model Tenant {
   themeColor    String?  @default("#6366f1") // Primary brand color
   themeName     String?  @default("default")
   logoUrl       String?
+  webhookUrl    String?
+  webhookVerifyToken String?
+  webhookVerifiedAt DateTime?
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -342,7 +345,8 @@ model Template {
   tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   
   // Template details from Meta
-  name      String   // Template name in Meta
+  name      String   // Template name used in Meta (snake_case)
+  displayName String? // Human-readable name shown in UI
   language  String   // e.g., en_US
   category  String   // MARKETING, UTILITY, AUTHENTICATION
   
@@ -357,6 +361,7 @@ model Template {
   footerText    String?
   
   buttons       Json?    // Array of button configs
+  components    Json?    // Raw Meta components payload
   
   // Metadata
   metaTemplateId String? // Meta's template ID
@@ -368,6 +373,7 @@ model Template {
   @@unique([tenantId, name, language])
   @@index([tenantId])
   @@index([status])
+  @@index([metaTemplateId])
 }
 
 enum TemplateStatus {

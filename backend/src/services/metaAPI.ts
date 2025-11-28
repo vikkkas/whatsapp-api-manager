@@ -257,7 +257,7 @@ export class MetaWhatsAppAPI {
     try {
       const response = await this.axiosInstance.get(`/${businessAccountId}/message_templates`, {
         params: {
-          fields: 'name,language,status,category,components',
+          fields: 'name,language,status,category,components,id,rejection_reason',
           limit: 100,
         },
       });
@@ -310,15 +310,16 @@ export class MetaWhatsAppAPI {
   /**
    * Delete a message template
    */
-  async deleteTemplate(businessAccountId: string, templateName: string) {
+  async deleteTemplate(businessAccountId: string, templateName: string, language: string) {
     try {
       await this.axiosInstance.delete(`/${businessAccountId}/message_templates`, {
         params: {
           name: templateName,
+          language,
         },
       });
 
-      log.info('Template deleted', { templateName });
+      log.info('Template deleted', { templateName, language });
 
       return { success: true };
     } catch (error) {
