@@ -20,7 +20,7 @@ router.use(enforceTenantIsolation);
 const sendMessageSchema = z.object({
   phoneNumberId: z.string(),
   to: z.string(),
-  type: z.enum(['text', 'image', 'video', 'audio', 'document', 'template']),
+  type: z.enum(['text', 'image', 'video', 'audio', 'document', 'template', 'interactive']),
   text: z.string().optional(),
   mediaUrl: z.string().url().optional(),
   caption: z.string().optional(),
@@ -28,6 +28,7 @@ const sendMessageSchema = z.object({
   templateName: z.string().optional(),
   languageCode: z.string().optional(),
   templateComponents: z.array(z.any()).optional(),
+  interactive: z.any().optional(),
 });
 
 const renderTemplateBody = (bodyText?: string | null, components?: Array<any>) => {
@@ -261,32 +262,16 @@ router.post('/', requirePermission('SEND_MESSAGES'), async (req: Request, res: R
       if (data.type === 'text' && data.text) {
         const result = await metaAPI.sendTextMessage(metaRecipient, data.text, { preview_url: true });
         waMessageId = result.messageId;
+      } else if (data.type === 'interactive' && data.interactive) {
+        const result = await metaAPI.sendInteractiveMessage(metaRecipient, data.interactive);
+        waMessageId = result.messageId;
+        // Set text for database storage
+        if (data.interactive.body && data.interactive.body.text) {
+          data.text = data.interactive.body.text;
+        }
       } else if (data.type === 'template') {
         const templateName = templateData?.name || data.templateName;
         const languageCode = data.languageCode || templateData?.language;
-
-        if (!templateName || !languageCode) {
-          throw new Error('Template name and language code are required for template messages');
-        }
-
-        const componentsForSend =
-          data.templateComponents !== undefined ? data.templateComponents : undefined;
-
-        const renderedBody = renderTemplateBody(templateData?.bodyText, componentsForSend);
-
-        const result = await metaAPI.sendTemplate(
-          metaRecipient,
-          templateName,
-          languageCode,
-          componentsForSend && componentsForSend.length > 0 ? componentsForSend : undefined
-        );
-        waMessageId = result.messageId;
-
-        data.text = renderedBody || templateData?.bodyText || data.text || null;
-        data.templateName = templateName;
-        if (languageCode) {
-          data.languageCode = languageCode;
-        }
       } else if (data.mediaUrl) {
         // For media messages, you'd typically upload the media first to get a mediaId
         // For now, we'll use the URL directly (requires link parameter in sendMediaMessage)

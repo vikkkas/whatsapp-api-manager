@@ -63,11 +63,31 @@ export class CampaignScheduler {
 
       // Add each campaign to the queue
       for (const campaign of campaigns) {
+        // Atomically update status to prevent double-processing
+        // This handles the case where multiple backend instances might be running
+        const result = await prisma.campaign.updateMany({
+          where: { 
+            id: campaign.id, 
+            status: 'SCHEDULED' 
+          },
+          data: { 
+            status: 'IN_PROGRESS',
+            startedAt: new Date()
+          }
+        });
+
+        // If count is 0, it means another process already picked it up
+        if (result.count === 0) {
+          continue;
+        }
+
         try {
           await campaignQueue.add('execute', {
             campaignId: campaign.id,
           }, {
-            jobId: `campaign-${campaign.id}-${Date.now()}`,
+            // Use campaign ID as job ID to prevent duplicate jobs for the same campaign
+            jobId: `campaign-${campaign.id}`,
+            removeOnComplete: true
           });
 
           log.info('Campaign added to queue', {
@@ -80,6 +100,12 @@ export class CampaignScheduler {
           log.error('Failed to add campaign to queue', {
             campaignId: campaign.id,
             error: error.message,
+          });
+          
+          // Revert status if queueing fails so it can be retried
+          await prisma.campaign.update({
+            where: { id: campaign.id },
+            data: { status: 'SCHEDULED', startedAt: null }
           });
         }
       }

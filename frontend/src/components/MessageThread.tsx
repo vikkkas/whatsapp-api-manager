@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { conversationAPI, messageAPI, settingsAPI, type Conversation } from '../lib/api';
+import { conversationAPI, messageAPI, settingsAPI, cannedResponseAPI, type Conversation } from '../lib/api';
 import { useConversationStore } from '../store/conversationStore';
 import { useMessageStore } from '../store/messageStore';
 import { useWebSocket } from '../contexts/WebSocketContext';
@@ -25,7 +25,8 @@ import {
   Edit3,
   X,
   Smile,
-  Mic
+  Mic,
+  MousePointerClick
 } from 'lucide-react';
 import { format, isSameDay } from 'date-fns';
 import {
@@ -34,6 +35,16 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+  DialogFooter,
+} from './ui/dialog';
+import { Label } from './ui/label';
+import { mediaAPI } from '../lib/api';
 import { toast } from 'sonner';
 
 interface Props {
@@ -52,6 +63,17 @@ export function MessageThread({ conversationId, onBack }: Props) {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Canned Responses State
+  const [cannedResponses, setCannedResponses] = useState<any[]>([]);
+  const [showCannedResponses, setShowCannedResponses] = useState(false);
+  const [filteredResponses, setFilteredResponses] = useState<any[]>([]);
+
+  // Interactive Message State
+  const [isInteractiveDialogOpen, setIsInteractiveDialogOpen] = useState(false);
+  const [interactiveBody, setInteractiveBody] = useState('');
+  const [interactiveButtons, setInteractiveButtons] = useState(['', '', '']);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const { messagesByConversation, isSending, setMessages, setSending, addMessage } = useMessageStore();
   const { typingUsers, resetUnreadCount, updateConversation: updateConversationStore } = useConversationStore();
@@ -109,6 +131,20 @@ export function MessageThread({ conversationId, onBack }: Props) {
     };
 
     fetchSettings();
+    fetchSettings();
+  }, []);
+
+  // Load canned responses
+  useEffect(() => {
+    const loadCannedResponses = async () => {
+      try {
+        const response = await cannedResponseAPI.list();
+        setCannedResponses(response.responses || []);
+      } catch (error) {
+        console.error('Failed to load canned responses', error);
+      }
+    };
+    loadCannedResponses();
   }, []);
 
   // Auto-scroll to bottom when messages change
@@ -234,6 +270,116 @@ export function MessageThread({ conversationId, onBack }: Props) {
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!phoneNumberId) {
+      toast.error('Configure your WhatsApp number in Settings first.');
+      return;
+    }
+
+    setSending(true);
+    try {
+      const response = await mediaAPI.upload(file);
+      const { url, mimetype, originalname } = response.data;
+      
+      let type: any = 'document';
+      if (mimetype.startsWith('image/')) type = 'image';
+      else if (mimetype.startsWith('video/')) type = 'video';
+      else if (mimetype.startsWith('audio/')) type = 'audio';
+
+      const sentMessage = await messageAPI.send({
+        phoneNumberId,
+        to: conversation!.contactPhone,
+        type,
+        mediaUrl: url,
+        caption: originalname,
+        filename: originalname,
+      });
+      
+      addMessage(conversationId, sentMessage);
+      setConversation((prev) =>
+        prev
+          ? {
+              ...prev,
+              lastMessageAt: sentMessage.createdAt,
+              messages: prev.messages ? [...prev.messages, sentMessage] : [sentMessage],
+            }
+          : prev
+      );
+    } catch (error) {
+      console.error('File upload error:', error);
+      toast.error('Failed to send file');
+    } finally {
+      setSending(false);
+      if (fileInputRef.current) fileInputRef.current.value = '';
+    }
+  };
+
+  const handleSendInteractive = async () => {
+    if (!interactiveBody.trim()) {
+      toast.error('Body text is required');
+      return;
+    }
+    
+    if (!phoneNumberId) {
+      toast.error('Configure your WhatsApp number in Settings first.');
+      return;
+    }
+
+    const buttons = interactiveButtons
+      .map((b, i) => ({ label: b.trim(), id: `btn-${Date.now()}-${i}` }))
+      .filter(b => b.label);
+
+    if (buttons.length === 0) {
+      toast.error('Add at least one button');
+      return;
+    }
+
+    setSending(true);
+    try {
+      const sentMessage = await messageAPI.send({
+        phoneNumberId,
+        to: conversation!.contactPhone,
+        type: 'interactive',
+        interactive: {
+          type: 'button',
+          body: { text: interactiveBody },
+          action: {
+            buttons: buttons.map(b => ({
+              type: 'reply',
+              reply: {
+                id: b.id,
+                title: b.label
+              }
+            }))
+          }
+        }
+      });
+      
+      setIsInteractiveDialogOpen(false);
+      setInteractiveBody('');
+      setInteractiveButtons(['', '', '']);
+      
+      addMessage(conversationId, sentMessage);
+      setConversation((prev) =>
+        prev
+          ? {
+              ...prev,
+              lastMessageAt: sentMessage.createdAt,
+              messages: prev.messages ? [...prev.messages, sentMessage] : [sentMessage],
+            }
+          : prev
+      );
+    } catch (error) {
+      console.error('Interactive message error:', error);
+      toast.error('Failed to send buttons');
+    } finally {
+      setSending(false);
+    }
+  };
+
   const getStatusIcon = (status: string) => {
     switch (status) {
       case 'PENDING':
@@ -306,6 +452,17 @@ export function MessageThread({ conversationId, onBack }: Props) {
               <p className="text-xs opacity-70">Click to download</p>
             </div>
           </a>
+        );
+
+      case 'INTERACTIVE':
+        return (
+          <div className="space-y-2">
+            <p className="whitespace-pre-wrap break-words leading-relaxed">{message.text}</p>
+            <div className="text-[10px] uppercase tracking-wider font-bold opacity-70 mt-1 flex items-center gap-1">
+              <MousePointerClick className="h-3 w-3" />
+              Interactive Message
+            </div>
+          </div>
         );
       
       default:
@@ -574,11 +731,19 @@ export function MessageThread({ conversationId, onBack }: Props) {
       <div className="flex-none px-6 py-4 bg-white border-t border-gray-100">
         <form onSubmit={handleSendMessage} className="flex items-end gap-3 max-w-4xl mx-auto w-full">
           <div className="flex items-center gap-2 pb-3">
+            <input
+              type="file"
+              ref={fileInputRef}
+              className="hidden"
+              onChange={handleFileUpload}
+            />
             <Button
               type="button"
               variant="ghost"
               size="icon"
+              onClick={() => fileInputRef.current?.click()}
               className="text-gray-400 hover:text-black hover:bg-gray-100 rounded-full"
+              title="Attach File"
             >
               <Paperclip className="h-5 w-5" />
             </Button>
@@ -586,21 +751,119 @@ export function MessageThread({ conversationId, onBack }: Props) {
               type="button"
               variant="ghost"
               size="icon"
+              onClick={() => {
+                if (fileInputRef.current) {
+                  fileInputRef.current.accept = "image/*,video/*";
+                  fileInputRef.current.click();
+                }
+              }}
               className="text-gray-400 hover:text-black hover:bg-gray-100 rounded-full"
+              title="Send Image/Video"
             >
               <ImageIcon className="h-5 w-5" />
             </Button>
+            
+            <Dialog open={isInteractiveDialogOpen} onOpenChange={setIsInteractiveDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="text-gray-400 hover:text-black hover:bg-gray-100 rounded-full"
+                  title="Send Buttons"
+                >
+                  <MousePointerClick className="h-5 w-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Send Interactive Message</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4 py-4">
+                  <div className="space-y-2">
+                    <Label>Message Body</Label>
+                    <Input
+                      value={interactiveBody}
+                      onChange={(e) => setInteractiveBody(e.target.value)}
+                      placeholder="Enter your message text..."
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Buttons (Max 3)</Label>
+                    {interactiveButtons.map((btn, idx) => (
+                      <Input
+                        key={idx}
+                        value={btn}
+                        onChange={(e) => {
+                          const newButtons = [...interactiveButtons];
+                          newButtons[idx] = e.target.value;
+                          setInteractiveButtons(newButtons);
+                        }}
+                        placeholder={`Button ${idx + 1} Label`}
+                      />
+                    ))}
+                  </div>
+                </div>
+                <DialogFooter>
+                  <Button variant="outline" onClick={() => setIsInteractiveDialogOpen(false)}>Cancel</Button>
+                  <Button onClick={handleSendInteractive} disabled={isSending}>Send Message</Button>
+                </DialogFooter>
+              </DialogContent>
+            </Dialog>
           </div>
 
           <div className="flex-1 relative">
+            {showCannedResponses && (
+              <div className="absolute bottom-full mb-2 left-0 w-full bg-white rounded-lg shadow-xl border border-gray-200 max-h-60 overflow-y-auto z-50">
+                {filteredResponses.map((response) => (
+                  <button
+                    key={response.id}
+                    type="button"
+                    onClick={() => {
+                      const newValue = newMessage.replace(/\/([\w-]*)$/, response.content);
+                      setNewMessage(newValue);
+                      setShowCannedResponses(false);
+                      inputRef.current?.focus();
+                    }}
+                    className="w-full text-left px-4 py-3 hover:bg-gray-50 border-b border-gray-100 last:border-0 transition-colors"
+                  >
+                    <div className="flex justify-between items-center mb-1">
+                      <span className="font-bold text-sm text-blue-600">{response.shortcut}</span>
+                      {response.category && (
+                        <Badge variant="outline" className="text-[10px] px-1.5 py-0 h-5">{response.category}</Badge>
+                      )}
+                    </div>
+                    <p className="text-sm font-medium text-gray-900 truncate">{response.title}</p>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{response.content}</p>
+                  </button>
+                ))}
+              </div>
+            )}
             <Input
               ref={inputRef}
               type="text"
               placeholder="Type a message..."
               value={newMessage}
+              value={newMessage}
               onChange={(e) => {
-                setNewMessage(e.target.value);
+                const value = e.target.value;
+                setNewMessage(value);
                 handleTyping();
+
+                // Check for canned response trigger "/"
+                const match = value.match(/\/([\w-]*)$/);
+                if (match) {
+                  const query = match[1].toLowerCase();
+                  const filtered = cannedResponses.filter(
+                    (r) => 
+                      r.shortcut.toLowerCase().includes(query) || 
+                      r.title.toLowerCase().includes(query)
+                  );
+                  setFilteredResponses(filtered);
+                  setShowCannedResponses(filtered.length > 0);
+                } else {
+                  setShowCannedResponses(false);
+                }
               }}
               onKeyPress={handleKeyPress}
               disabled={isSending}
