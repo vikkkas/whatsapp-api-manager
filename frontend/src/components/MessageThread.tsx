@@ -844,7 +844,6 @@ export function MessageThread({ conversationId, onBack }: Props) {
               type="text"
               placeholder="Type a message..."
               value={newMessage}
-              value={newMessage}
               onChange={(e) => {
                 const value = e.target.value;
                 setNewMessage(value);
