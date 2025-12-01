@@ -17,10 +17,14 @@ export class FlowExecutor {
       // Filter for keywords if needed
       const matchingFlows = flows.filter(flow => {
         if (triggerType !== 'KEYWORD') return true;
-        if (!flow.trigger) return false;
-        // Simple case-insensitive match
-        const messageBody = data.messageBody || '';
-        return messageBody.toLowerCase().includes(flow.trigger.toLowerCase());
+        if (!flow.trigger || !data.messageBody) return false;
+        
+        // Split keywords by comma and trim each - FIXED for multiple keywords
+        const keywords = flow.trigger.split(',').map(k => k.toLowerCase().trim());
+        const message = data.messageBody.toLowerCase().trim();
+        
+        // Check if message contains ANY of the keywords
+        return keywords.some(keyword => message.includes(keyword));
       });
 
       for (const flow of matchingFlows) {

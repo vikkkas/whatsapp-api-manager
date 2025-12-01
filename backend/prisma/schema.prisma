@@ -641,9 +641,6 @@ model Flow {
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
-  // Relations
-  executions  FlowExecution[]
-
   @@index([tenantId])
   @@index([isActive])
   @@index([triggerType])
@@ -654,62 +651,4 @@ enum FlowTriggerType {
   NEW_MESSAGE
   CONVERSATION_OPENED
   MANUAL
-  BUTTON_CLICK
-}
-
-// ============================================
-// FLOW EXECUTION (Outbox Pattern)
-// ============================================
-
-model FlowExecution {
-  id          String   @id @default(cuid())
-  
-  // Flow reference
-  flowId      String
-  flow        Flow     @relation(fields: [flowId], references: [id], onDelete: Cascade)
-  
-  tenantId    String
-  
-  // Execution context
-  contactPhone    String
-  contactId       String?
-  conversationId  String?
-  messageBody     String?
-  messageType     String?
-  
-  // Trigger information
-  triggeredBy     FlowTriggerType
-  triggerData     Json?  // Additional trigger context
-  
-  // Execution state
-  status          FlowExecutionStatus @default(PENDING)
-  currentNodeId   String?
-  executionState  Json?  // Variables, button clicks, etc.
-  
-  // Timing
-  startedAt       DateTime?
-  completedAt     DateTime?
-  
-  // Error handling
-  error           String?
-  retryCount      Int      @default(0)
-  maxRetries      Int      @default(3)
-  
-  // Audit
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  
-  @@index([flowId])
-  @@index([tenantId])
-  @@index([status])
-  @@index([createdAt])
-  @@index([status, createdAt])  // For polling pending executions
-}
-
-enum FlowExecutionStatus {
-  PENDING      // Waiting to be picked up
-  PROCESSING   // Currently executing
-  COMPLETED    // Successfully completed
-  FAILED       // Failed after retries
-  CANCELLED    // Manually cancelled
 }

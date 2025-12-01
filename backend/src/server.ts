@@ -186,13 +186,6 @@ import('./services/scheduler.js').then(({ campaignScheduler }) => {
   log.error('Failed to start campaign scheduler', { error });
 });
 
-// Start flow executor (Outbox Pattern)
-import('./services/flowExecutorOutbox.js').then(() => {
-  log.info('🔄 Flow executor service started (Outbox Pattern)');
-}).catch((error) => {
-  log.error('Failed to start flow executor', { error });
-});
-
 const server = httpServer.listen(PORT, () => {
   log.info(`🚀 Server started on port ${PORT}`);
   log.info(`📝 Environment: ${env.NODE_ENV}`);
