@@ -1,11 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Alert, AlertDescription } from '../components/ui/alert';
-import { Loader2, Lock, Mail, AlertCircle } from 'lucide-react';
+import { useNavigate, Link } from 'react-router-dom';
+import { Loader2, Lock, Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { authAPI } from '../lib/api';
 
 const Login = () => {
@@ -34,7 +29,6 @@ const Login = () => {
       const response = await authAPI.login(credentials.email, credentials.password);
       console.log('Login successful:', response.data.user);
       
-      // Store user and tenant in authStore
       if (window.location.pathname !== '/inbox') {
         navigate('/inbox');
       }
@@ -55,94 +49,149 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
-        <div className="text-center">
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
-            WhatsApp Manager
-          </h2>
-          <p className="mt-2 text-sm text-gray-600">
-            Sign in to your account
-          </p>
+    <div className="min-h-screen bg-white flex">
+      {/* Left Side - Branding (Black) */}
+      <div className="hidden lg:flex lg:w-1/2 bg-black p-12 flex-col justify-between relative overflow-hidden text-white">
+        {/* Abstract Background */}
+        <div className="absolute inset-0 opacity-20">
+          <div className="absolute top-20 left-20 w-64 h-64 bg-purple-600 rounded-full blur-[100px]" />
+          <div className="absolute bottom-20 right-20 w-96 h-96 bg-blue-600 rounded-full blur-[100px]" />
         </div>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Login</CardTitle>
-            <CardDescription>
-              Enter your credentials to access the dashboard
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
-                <Alert variant="destructive">
-                  <AlertCircle className="h-4 w-4" />
-                  <AlertDescription>{error}</AlertDescription>
-                </Alert>
-              )}
+        <div className="relative z-10">
+          <Link to="/" className="flex items-center gap-2 text-white">
+            <span className="text-2xl font-extrabold tracking-tight">
+              WhatsApp<span className="text-yellow-400">Pro</span>
+            </span>
+          </Link>
+        </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="email"
-                    name="email"
-                    type="email"
-                    autoComplete="email"
-                    required
-                    className="pl-10"
-                    placeholder="admin@demo.com"
-                    value={credentials.email}
-                    onChange={handleInputChange}
-                    disabled={isLoading}
-                  />
+        <div className="relative z-10">
+          <h2 className="text-5xl font-black leading-tight mb-8">
+            Welcome back to<br />
+            your dashboard
+          </h2>
+          <div className="space-y-6">
+            {[
+              'Manage your conversations',
+              'View real-time analytics',
+              'Update automation flows',
+              'Monitor team performance'
+            ].map((feature, index) => (
+              <div key={index} className="flex items-center gap-4 text-gray-300">
+                <div className="w-6 h-6 rounded-full bg-yellow-400 flex items-center justify-center text-black">
+                  <CheckCircle2 className="h-4 w-4" />
                 </div>
+                <span className="text-lg font-medium">{feature}</span>
               </div>
+            ))}
+          </div>
+        </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                  <Input
-                    id="password"
-                    name="password"
-                    type="password"
-                    autoComplete="current-password"
-                    required
-                    className="pl-10"
-                    placeholder="Enter your password"
-                    value={credentials.password}
-                    onChange={handleInputChange}
-                    disabled={isLoading}
-                  />
-                </div>
+        <div className="relative z-10 text-gray-500 text-sm font-medium">
+          © 2025 WhatsAppPro. All rights reserved.
+        </div>
+      </div>
+
+      {/* Right Side - Form (White) */}
+      <div className="flex-1 flex items-center justify-center p-8 bg-white text-black">
+        <div className="w-full max-w-md">
+          {/* Mobile Logo */}
+          <div className="lg:hidden mb-8 text-center">
+            <Link to="/" className="inline-flex items-center gap-2">
+              <span className="text-2xl font-extrabold tracking-tight">
+                WhatsApp<span className="text-[#4c47ff]">Pro</span>
+              </span>
+            </Link>
+          </div>
+
+          <div className="mb-10">
+            <h2 className="text-3xl font-black text-black mb-2">Sign in</h2>
+            <p className="text-gray-500 font-medium">Access your account</p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            {error && (
+              <div className="p-4 bg-red-50 border border-red-100 rounded-lg text-red-600 text-sm font-bold">
+                {error}
               </div>
+            )}
 
-              <Button
-                type="submit"
-                className="w-full"
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    Signing in...
-                  </>
-                ) : (
-                  'Sign in'
-                )}
-              </Button>
-            </form>
-
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-600">
-                Demo credentials: admin@demo.com / admin123
-              </p>
+            <div>
+              <label className="block text-sm font-bold text-black mb-2">
+                Email address
+              </label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  name="email"
+                  type="email"
+                  required
+                  value={credentials.email}
+                  onChange={handleInputChange}
+                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-0 focus:border-black outline-none transition-all font-medium"
+                  placeholder="you@company.com"
+                />
+              </div>
             </div>
-          </CardContent>
-        </Card>
+
+            <div>
+              <label className="block text-sm font-bold text-black mb-2">
+                Password
+              </label>
+              <div className="relative">
+                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                <input
+                  name="password"
+                  type="password"
+                  required
+                  value={credentials.password}
+                  onChange={handleInputChange}
+                  className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-0 focus:border-black outline-none transition-all font-medium"
+                  placeholder="••••••••"
+                />
+              </div>
+            </div>
+
+            <button
+              type="submit"
+              disabled={isLoading}
+              className="w-full py-4 bg-black text-white rounded-lg font-bold text-lg hover:bg-gray-900 hover:scale-[1.02] transition-all flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isLoading ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" />
+                  Signing in...
+                </>
+              ) : (
+                <>
+                  Sign in
+                  <ArrowRight className="h-5 w-5" />
+                </>
+              )}
+            </button>
+          </form>
+
+          <div className="mt-8 text-center space-y-4">
+            <p className="text-sm font-medium text-gray-500">
+              Don't have an account?{' '}
+              <Link to="/signup" className="text-black font-bold hover:underline">
+                Create free account
+              </Link>
+            </p>
+
+            <p className="text-sm font-medium text-gray-500">
+              Are you an agent?{' '}
+              <Link to="/agent-login" className="text-black font-bold hover:underline">
+                Agent Login
+              </Link>
+            </p>
+            
+            <div className="text-xs text-gray-400">
+              Demo credentials: admin@demo.com / admin123
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

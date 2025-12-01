@@ -11,8 +11,11 @@ import { OnboardingGuard } from "./components/OnboardingGuard";
 import { DashboardLayout } from "./components/DashboardLayout";
 import ProtectedRoute from "./components/ProtectedRoute";
 import AdminRoute from "./components/AdminRoute";
+import { PermissionGuard } from "./components/PermissionGuard";
 
 // Lazy load pages for better performance
+const LandingPage = lazy(() => import("./pages/LandingPage"));
+const SignUpPage = lazy(() => import("./pages/SignUpPage"));
 const Login = lazy(() => import("./pages/Login"));
 const Inbox = lazy(() => import("./pages/Inbox"));
 const SendMessage = lazy(() => import("./pages/SendMessage"));
@@ -21,6 +24,13 @@ const Templates = lazy(() => import("./pages/Templates"));
 const SettingsPage = lazy(() => import("./pages/SettingsPage"));
 const TemplateManagement = lazy(() => import("./pages/TemplateManagement"));
 const UserManagement = lazy(() => import("./pages/UserManagement"));
+const ContactManagement = lazy(() => import("./pages/ContactManagement"));
+const CampaignManagement = lazy(() => import("./pages/CampaignManagement"));
+const AgentManagement = lazy(() => import("./pages/AgentManagement"));
+const CannedResponses = lazy(() => import("./pages/CannedResponses"));
+const AgentLogin = lazy(() => import("./pages/AgentLogin"));
+const FlowList = lazy(() => import("./pages/FlowList"));
+const FlowBuilder = lazy(() => import("./pages/FlowBuilder"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -53,11 +63,14 @@ const App = () => (
               <Suspense fallback={<PageLoader />}>
                 <Routes>
                   {/* Public routes */}
+                  <Route path="/" element={<LandingPage />} />
+                  <Route path="/signup" element={<SignUpPage />} />
                   <Route path="/login" element={<Login />} />
+                  <Route path="/agent-login" element={<AgentLogin />} />
                   
                   {/* Protected routes with dashboard layout */}
                   <Route
-                    path="/"
+                    path="/dashboard"
                     element={
                       <ProtectedRoute>
                         <OnboardingGuard>
@@ -75,7 +88,9 @@ const App = () => (
                     element={
                       <ProtectedRoute>
                         <DashboardLayout>
-                          <SettingsPage />
+                          <PermissionGuard permission="VIEW_SETTINGS">
+                            <SettingsPage />
+                          </PermissionGuard>
                         </DashboardLayout>
                       </ProtectedRoute>
                     }
@@ -88,7 +103,9 @@ const App = () => (
                       <ProtectedRoute>
                         <OnboardingGuard>
                           <DashboardLayout>
-                            <Inbox />
+                            <PermissionGuard permission="VIEW_CONVERSATIONS">
+                              <Inbox />
+                            </PermissionGuard>
                           </DashboardLayout>
                         </OnboardingGuard>
                       </ProtectedRoute>
@@ -100,7 +117,9 @@ const App = () => (
                       <ProtectedRoute>
                         <OnboardingGuard>
                           <DashboardLayout>
-                            <TemplateManagement />
+                            <PermissionGuard permission="VIEW_TEMPLATES">
+                              <TemplateManagement />
+                            </PermissionGuard>
                           </DashboardLayout>
                         </OnboardingGuard>
                       </ProtectedRoute>
@@ -114,14 +133,103 @@ const App = () => (
                       <ProtectedRoute>
                         <OnboardingGuard>
                           <DashboardLayout>
-                            <Analytics />
+                            <PermissionGuard permission="VIEW_ANALYTICS">
+                              <Analytics />
+                            </PermissionGuard>
                           </DashboardLayout>
                         </OnboardingGuard>
                       </ProtectedRoute>
                     }
                   />
                 
+                  {/* Contacts - protected route */}
+                  <Route
+                    path="/contacts"
+                    element={
+                      <ProtectedRoute>
+                        <OnboardingGuard>
+                          <DashboardLayout>
+                            <PermissionGuard permission="VIEW_CONTACTS">
+                              <ContactManagement />
+                            </PermissionGuard>
+                          </DashboardLayout>
+                        </OnboardingGuard>
+                      </ProtectedRoute>
+                    }
+                  />
+                
+                  {/* Campaigns - protected route */}
+                  <Route
+                    path="/campaigns"
+                    element={
+                      <ProtectedRoute>
+                        <OnboardingGuard>
+                          <DashboardLayout>
+                            <PermissionGuard permission="VIEW_CAMPAIGNS">
+                              <CampaignManagement />
+                            </PermissionGuard>
+                          </DashboardLayout>
+                        </OnboardingGuard>
+                      </ProtectedRoute>
+                    }
+                  />
+                
+                  {/* Canned Responses - protected route */}
+                  <Route
+                    path="/canned-responses"
+                    element={
+                      <ProtectedRoute>
+                        <OnboardingGuard>
+                          <DashboardLayout>
+                            <PermissionGuard permission="VIEW_CANNED_RESPONSES">
+                              <CannedResponses />
+                            </PermissionGuard>
+                          </DashboardLayout>
+                        </OnboardingGuard>
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Flows - protected route */}
+                  <Route
+                    path="/flows"
+                    element={
+                      <ProtectedRoute>
+                        <OnboardingGuard>
+                          <DashboardLayout>
+                            <PermissionGuard permission="VIEW_FLOWS">
+                              <FlowList />
+                            </PermissionGuard>
+                          </DashboardLayout>
+                        </OnboardingGuard>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/flows/:id"
+                    element={
+                      <ProtectedRoute>
+                        <OnboardingGuard>
+                          <PermissionGuard permission="EDIT_FLOWS">
+                            <FlowBuilder />
+                          </PermissionGuard>
+                        </OnboardingGuard>
+                      </ProtectedRoute>
+                    }
+                  />
+                
                 {/* Admin only routes */}
+                <Route
+                  path="/agents"
+                  element={
+                    <AdminRoute>
+                      <DashboardLayout>
+                        <AgentManagement />
+                      </DashboardLayout>
+                    </AdminRoute>
+                  }
+                />
+                
                 <Route
                   path="/users"
                   element={

@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import prisma from '../config/prisma.js';
 import { authenticate } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import { enforceTenantIsolation } from '../middleware/tenant.js';
 import { log } from '../utils/logger.js';
 import { normalizePhoneNumber } from '../utils/phone.js';
@@ -63,7 +64,7 @@ const listMessagesSchema = z.object({
  * GET /api/messages
  * List messages with filters and pagination
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', requirePermission('VIEW_CONVERSATIONS'), async (req: Request, res: Response) => {
   try {
     const query = listMessagesSchema.parse(req.query);
     const tenantId = req.user!.tenantId;
@@ -127,7 +128,7 @@ router.get('/', async (req: Request, res: Response) => {
  * GET /api/messages/:id
  * Get a specific message
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', requirePermission('VIEW_CONVERSATIONS'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const tenantId = req.user!.tenantId;
@@ -157,7 +158,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  * POST /api/messages
  * Send a new message directly to WhatsApp API
  */
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requirePermission('SEND_MESSAGES'), async (req: Request, res: Response) => {
   try {
     const data = sendMessageSchema.parse(req.body);
     const tenantId = req.user!.tenantId;
@@ -391,7 +392,7 @@ router.post('/', async (req: Request, res: Response) => {
  * PATCH /api/messages/:id
  * Update message status
  */
-router.patch('/:id', async (req: Request, res: Response) => {
+router.patch('/:id', requirePermission('SEND_MESSAGES'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const tenantId = req.user!.tenantId;

@@ -25,6 +25,10 @@ import healthRoutes from './routes/health.js';
 import mediaRoutes from './routes/media.js';
 import contactRoutes from './routes/contacts.js';
 import internalRoutes from './routes/internal.js';
+import campaignRoutes from './routes/campaigns.js';
+import cannedResponseRoutes from './routes/cannedResponses.js';
+import agentRoutes from './routes/agents.js';
+import flowRoutes from './routes/flows.js';
 
 const app: Express = express();
 const PORT = env.PORT;
@@ -107,7 +111,11 @@ app.use('/api/settings', settingsRoutes);
 app.use('/api/analytics', analyticsRoutes);
 app.use('/api/media', mediaRoutes);
 app.use('/api/contacts', contactRoutes);
+app.use('/api/campaigns', campaignRoutes);
+app.use('/api/canned-responses', cannedResponseRoutes);
+app.use('/api/agents', agentRoutes);
 app.use('/api/internal', internalRoutes);
+app.use('/api/flows', flowRoutes);
 
 // ============================================
 // ROOT ENDPOINT
@@ -169,6 +177,14 @@ let io: any;
 (async () => {
   io = await setupWebSocket(httpServer);
 })();
+
+// Start campaign scheduler
+import('./services/scheduler.js').then(({ campaignScheduler }) => {
+  campaignScheduler.start();
+  log.info('📅 Campaign scheduler initialized');
+}).catch((error) => {
+  log.error('Failed to start campaign scheduler', { error });
+});
 
 const server = httpServer.listen(PORT, () => {
   log.info(`🚀 Server started on port ${PORT}`);

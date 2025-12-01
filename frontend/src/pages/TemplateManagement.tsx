@@ -1,10 +1,10 @@
 import { useState, useEffect } from 'react';
-import { Button } from '../components/ui/button';
-import { Input } from '../components/ui/input';
-import { Label } from '../components/ui/label';
-import { Textarea } from '../components/ui/textarea';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../components/ui/card';
-import { Badge } from '../components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { 
   Dialog, 
   DialogContent, 
@@ -12,14 +12,14 @@ import {
   DialogFooter, 
   DialogHeader, 
   DialogTitle 
-} from '../components/ui/dialog';
+} from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '../components/ui/select';
+} from '@/components/ui/select';
 import { 
   Plus, 
   Edit, 
@@ -33,9 +33,17 @@ import {
   Loader2,
   Send,
   FileText,
-  RefreshCw
+  RefreshCw,
+  MoreVertical,
+  LayoutTemplate
 } from 'lucide-react';
-import { templateAPI, templateMessageAPI, settingsAPI } from '../lib/api';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { templateAPI, templateMessageAPI, settingsAPI } from '@/lib/api';
 import { toast } from 'sonner';
 
 interface Template {
@@ -296,13 +304,13 @@ const TemplateManagement = () => {
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'APPROVED':
-        return <Badge className="bg-green-500"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
+        return <Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-none"><CheckCircle className="h-3 w-3 mr-1" />Approved</Badge>;
       case 'PENDING':
-        return <Badge className="bg-yellow-500"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
+        return <Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-none"><Clock className="h-3 w-3 mr-1" />Pending</Badge>;
       case 'REJECTED':
-        return <Badge variant="destructive"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
+        return <Badge className="bg-red-100 text-red-700 hover:bg-red-200 border-none"><XCircle className="h-3 w-3 mr-1" />Rejected</Badge>;
       case 'DISABLED':
-        return <Badge className="bg-gray-400">Disabled</Badge>;
+        return <Badge className="bg-gray-100 text-gray-700 hover:bg-gray-200 border-none">Disabled</Badge>;
       default:
         return null;
     }
@@ -321,36 +329,36 @@ const TemplateManagement = () => {
     const buttonsComponent = template.components.find(c => c.type === 'BUTTONS');
 
     return (
-      <div className="border rounded-lg p-4 bg-white max-w-md mx-auto">
-        <div className="mb-3 text-xs uppercase tracking-wide text-gray-400">
-          Meta Name: {template.metaName || 'N/A'}
+      <div className="border rounded-xl p-4 bg-white max-w-md mx-auto shadow-sm">
+        <div className="mb-3 text-xs uppercase tracking-wide text-gray-400 font-semibold">
+          {template.category}
         </div>
         {headerComponent && (
-          <div className="font-semibold text-lg mb-2">
+          <div className="font-bold text-gray-900 text-lg mb-2">
             {headerComponent.text}
           </div>
         )}
         {bodyComponent && (
-          <div className="mb-2 whitespace-pre-wrap">
+          <div className="mb-2 whitespace-pre-wrap text-gray-700 leading-relaxed">
             {bodyComponent.text}
           </div>
         )}
         {footerComponent && (
-          <div className="text-xs text-gray-500 mt-2">
+          <div className="text-xs text-gray-400 mt-3 pt-2 border-t border-gray-100">
             {footerComponent.text}
           </div>
         )}
         {template.rejectionReason && (
-          <div className="mt-3 rounded border border-red-100 bg-red-50 p-3 text-xs text-red-600">
+          <div className="mt-3 rounded-lg border border-red-100 bg-red-50 p-3 text-xs text-red-600 font-medium">
             Rejection reason: {template.rejectionReason}
           </div>
         )}
         {buttonsComponent && buttonsComponent.buttons && (
-          <div className="mt-3 space-y-2">
+          <div className="mt-4 space-y-2">
             {buttonsComponent.buttons.map((button, idx) => (
               <button
                 key={idx}
-                className="w-full py-2 px-4 bg-blue-500 text-white rounded-lg hover:bg-blue-600"
+                className="w-full py-2.5 px-4 bg-white text-blue-600 font-semibold rounded-lg border border-gray-200 hover:bg-gray-50 shadow-sm transition-all text-sm"
               >
                 {button.text}
               </button>
@@ -422,14 +430,15 @@ const TemplateManagement = () => {
   };
 
   return (
-    <div className="p-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between mb-6">
+    <div className="p-8 max-w-7xl mx-auto space-y-8">
+      {/* Header */}
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold">Template Management</h1>
-          <p className="text-gray-600 mt-1">Create, sync, and monitor your WhatsApp Business templates</p>
+          <h1 className="text-3xl font-bold text-gray-900 tracking-tight">Templates</h1>
+          <p className="text-gray-500 mt-1">Create, sync, and monitor your WhatsApp Business templates.</p>
         </div>
         <div className="flex flex-wrap gap-3">
-          <Button variant="outline" onClick={handleSyncWithMeta} disabled={isSyncing}>
+          <Button variant="outline" onClick={handleSyncWithMeta} disabled={isSyncing} className="bg-white border-gray-200">
             {isSyncing ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -442,7 +451,7 @@ const TemplateManagement = () => {
               </>
             )}
           </Button>
-          <Button onClick={handleCreate}>
+          <Button onClick={handleCreate} className="bg-black text-white hover:bg-gray-800 shadow-lg">
             <Plus className="h-4 w-4 mr-2" />
             Create Template
           </Button>
@@ -450,69 +459,69 @@ const TemplateManagement = () => {
       </div>
 
       {/* Filters */}
-      <Card className="mb-6">
-        <CardContent className="pt-6">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Search templates..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-            <Select value={categoryFilter} onValueChange={setCategoryFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Categories</SelectItem>
-                <SelectItem value="MARKETING">Marketing</SelectItem>
-                <SelectItem value="UTILITY">Utility</SelectItem>
-                <SelectItem value="AUTHENTICATION">Authentication</SelectItem>
-              </SelectContent>
-            </Select>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger>
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="APPROVED">Approved</SelectItem>
-                <SelectItem value="PENDING">Pending</SelectItem>
-                <SelectItem value="REJECTED">Rejected</SelectItem>
-                <SelectItem value="DISABLED">Disabled</SelectItem>
-              </SelectContent>
-            </Select>
+      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Search templates..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 border-gray-200 bg-gray-50 focus:bg-white transition-all"
+            />
           </div>
-        </CardContent>
-      </Card>
+          <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+            <SelectTrigger className="border-gray-200 bg-gray-50 focus:bg-white transition-all">
+              <SelectValue placeholder="Category" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Categories</SelectItem>
+              <SelectItem value="MARKETING">Marketing</SelectItem>
+              <SelectItem value="UTILITY">Utility</SelectItem>
+              <SelectItem value="AUTHENTICATION">Authentication</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="border-gray-200 bg-gray-50 focus:bg-white transition-all">
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Status</SelectItem>
+              <SelectItem value="APPROVED">Approved</SelectItem>
+              <SelectItem value="PENDING">Pending</SelectItem>
+              <SelectItem value="REJECTED">Rejected</SelectItem>
+              <SelectItem value="DISABLED">Disabled</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
 
       {/* Templates Grid */}
       {isLoading ? (
         <div className="flex justify-center items-center h-64">
-          <Loader2 className="h-8 w-8 animate-spin text-gray-400" />
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
         </div>
       ) : filteredTemplates.length === 0 ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center h-64">
-            <p className="text-gray-500 text-lg">No templates found</p>
-            <Button onClick={handleCreate} className="mt-4">
-              <Plus className="h-4 w-4 mr-2" />
-              Create Your First Template
-            </Button>
-          </CardContent>
-        </Card>
+        <div className="flex flex-col items-center justify-center h-64">
+          <div className="bg-gray-100 p-4 rounded-full mb-4">
+            <LayoutTemplate className="h-8 w-8 text-gray-400" />
+          </div>
+          <p className="text-gray-900 font-medium text-lg">No templates found</p>
+          <p className="text-gray-500 mb-6">Get started by creating your first template.</p>
+          <Button onClick={handleCreate} className="bg-black text-white hover:bg-gray-800">
+            <Plus className="h-4 w-4 mr-2" />
+            Create Template
+          </Button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filteredTemplates.map((template) => (
-            <Card key={template.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
+            <Card key={template.id} className="hover:shadow-md transition-all border-gray-100 group bg-white">
+              <CardHeader className="pb-3">
                 <div className="flex justify-between items-start">
                   <div>
-                    <CardTitle className="text-lg">{template.name}</CardTitle>
-                    <CardDescription className="mt-1">
+                    <CardTitle className="text-base font-bold text-gray-900">{template.name}</CardTitle>
+                    <CardDescription className="mt-1 text-xs font-medium text-gray-500 uppercase tracking-wide">
                       {template.category} • {template.language.toUpperCase()}
                     </CardDescription>
                   </div>
@@ -520,32 +529,46 @@ const TemplateManagement = () => {
                 </div>
               </CardHeader>
               <CardContent>
-                <div className="space-y-3">
-                  <div className="text-sm text-gray-600 line-clamp-3">
+                <div className="space-y-4">
+                  <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-600 line-clamp-3 min-h-[4.5rem]">
                     {template.components.find(c => c.type === 'BODY')?.text || 'No content'}
                   </div>
+                  
                   {template.rejectionReason && (
-                    <div className="rounded border border-red-100 bg-red-50 p-2 text-xs text-red-600">
-                      Rejection reason: {template.rejectionReason}
+                    <div className="rounded-lg border border-red-100 bg-red-50 p-2 text-xs text-red-600 font-medium">
+                      Reason: {template.rejectionReason}
                     </div>
                   )}
-                  <div className="text-xs text-gray-400">
-                    Meta ID: {template.metaName || 'N/A'}
-                  </div>
-                  <div className="flex gap-2">
-                    <Button size="sm" variant="outline" onClick={() => handlePreview(template)} className="flex-1">
-                      <Eye className="h-4 w-4 mr-1" />
-                      Preview
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => openSendDialog(template)}>
-                      <Send className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleEdit(template)}>
-                      <Edit className="h-4 w-4" />
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={() => handleDelete(template)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
+                  
+                  <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+                    <div className="text-xs text-gray-400 font-mono">
+                      {template.metaName || 'ID: ' + template.id.slice(0, 8)}
+                    </div>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button variant="ghost" size="sm" className="h-8 w-8 p-0 text-gray-400 hover:text-gray-900">
+                          <MoreVertical className="h-4 w-4" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={() => handlePreview(template)}>
+                          <Eye className="h-4 w-4 mr-2" />
+                          Preview
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => openSendDialog(template)}>
+                          <Send className="h-4 w-4 mr-2" />
+                          Test Send
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleEdit(template)}>
+                          <Edit className="h-4 w-4 mr-2" />
+                          Edit
+                        </DropdownMenuItem>
+                        <DropdownMenuItem onClick={() => handleDelete(template)} className="text-red-600 focus:text-red-600">
+                          <Trash2 className="h-4 w-4 mr-2" />
+                          Delete
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
                   </div>
                 </div>
               </CardContent>
@@ -558,29 +581,30 @@ const TemplateManagement = () => {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
+            <DialogTitle className="text-xl font-bold">
               {selectedTemplate ? 'Edit Template' : 'Create New Template'}
             </DialogTitle>
             <DialogDescription>
               Create message templates with variables like {`{{1}}, {{2}}`} for personalization
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+          <form onSubmit={handleSubmit} className="space-y-6 py-4">
+            <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="name">Template Name *</Label>
+                <Label htmlFor="name" className="font-medium">Template Name *</Label>
                 <Input
                   id="name"
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="welcome_message"
                   required
+                  className="bg-gray-50 border-gray-200 focus:bg-white transition-all"
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="language">Language *</Label>
+                <Label htmlFor="language" className="font-medium">Language *</Label>
                 <Select value={formData.language} onValueChange={(value) => setFormData({ ...formData, language: value })}>
-                  <SelectTrigger>
+                  <SelectTrigger className="bg-gray-50 border-gray-200 focus:bg-white transition-all">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -594,9 +618,9 @@ const TemplateManagement = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="category">Category *</Label>
+              <Label htmlFor="category" className="font-medium">Category *</Label>
               <Select value={formData.category} onValueChange={(value) => setFormData({ ...formData, category: value })}>
-                <SelectTrigger>
+                <SelectTrigger className="bg-gray-50 border-gray-200 focus:bg-white transition-all">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -608,18 +632,19 @@ const TemplateManagement = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="header">Header (Optional)</Label>
+              <Label htmlFor="header" className="font-medium">Header (Optional)</Label>
               <Input
                 id="header"
                 value={formData.headerText}
                 onChange={(e) => setFormData({ ...formData, headerText: e.target.value })}
                 placeholder="Welcome to our service!"
                 maxLength={60}
+                className="bg-gray-50 border-gray-200 focus:bg-white transition-all"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="body">Body Text *</Label>
+              <Label htmlFor="body" className="font-medium">Body Text *</Label>
               <Textarea
                 id="body"
                 value={formData.bodyText}
@@ -628,6 +653,7 @@ const TemplateManagement = () => {
                 rows={6}
                 maxLength={1024}
                 required
+                className="bg-gray-50 border-gray-200 focus:bg-white transition-all resize-none"
               />
               <p className="text-xs text-gray-500">
                 Use {`{{1}}, {{2}}, {{3}}`} for variables. {formData.bodyText.length}/1024 characters
@@ -635,21 +661,22 @@ const TemplateManagement = () => {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="footer">Footer (Optional)</Label>
+              <Label htmlFor="footer" className="font-medium">Footer (Optional)</Label>
               <Input
                 id="footer"
                 value={formData.footerText}
                 onChange={(e) => setFormData({ ...formData, footerText: e.target.value })}
                 placeholder="Thank you for choosing us!"
                 maxLength={60}
+                className="bg-gray-50 border-gray-200 focus:bg-white transition-all"
               />
             </div>
 
-            <div className="space-y-2">
+            <div className="space-y-3">
               <div className="flex justify-between items-center">
-                <Label>Buttons (Optional)</Label>
-                <Button type="button" size="sm" variant="outline" onClick={addButton}>
-                  <Plus className="h-4 w-4 mr-1" />
+                <Label className="font-medium">Buttons (Optional)</Label>
+                <Button type="button" size="sm" variant="outline" onClick={addButton} className="text-xs">
+                  <Plus className="h-3 w-3 mr-1" />
                   Add Button
                 </Button>
               </div>
@@ -660,8 +687,9 @@ const TemplateManagement = () => {
                     onChange={(e) => updateButton(index, 'text', e.target.value)}
                     placeholder="Button text"
                     maxLength={20}
+                    className="bg-gray-50 border-gray-200 focus:bg-white transition-all"
                   />
-                  <Button type="button" size="sm" variant="outline" onClick={() => removeButton(index)}>
+                  <Button type="button" size="icon" variant="ghost" onClick={() => removeButton(index)} className="text-gray-400 hover:text-red-500">
                     <Trash2 className="h-4 w-4" />
                   </Button>
                 </div>
@@ -672,7 +700,7 @@ const TemplateManagement = () => {
               <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit">
+              <Button type="submit" className="bg-black text-white hover:bg-gray-800">
                 {selectedTemplate ? 'Update Template' : 'Create Template'}
               </Button>
             </DialogFooter>
@@ -682,14 +710,16 @@ const TemplateManagement = () => {
 
       {/* Preview Dialog */}
       <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
-        <DialogContent>
+        <DialogContent className="bg-gray-50">
           <DialogHeader>
             <DialogTitle>Template Preview</DialogTitle>
             <DialogDescription>
               How your template will appear to recipients
             </DialogDescription>
           </DialogHeader>
-          {selectedTemplate && renderTemplatePreview(selectedTemplate)}
+          <div className="py-4">
+            {selectedTemplate && renderTemplatePreview(selectedTemplate)}
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -703,38 +733,42 @@ const TemplateManagement = () => {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-4">
-            <div>
-              <Label>Phone Number</Label>
+            <div className="space-y-2">
+              <Label className="font-medium">Phone Number</Label>
               <Input
                 placeholder="e.g. +15551234567"
                 value={sendPhoneNumber}
                 onChange={(e) => setSendPhoneNumber(e.target.value)}
+                className="bg-gray-50 border-gray-200 focus:bg-white transition-all"
               />
             </div>
-            <div>
-              <Label>Language Code</Label>
+            <div className="space-y-2">
+              <Label className="font-medium">Language Code</Label>
               <Input
                 placeholder="en_US"
                 value={sendLanguage}
                 onChange={(e) => setSendLanguage(e.target.value)}
+                className="bg-gray-50 border-gray-200 focus:bg-white transition-all"
               />
             </div>
             {selectedTemplate && (
-              <div className="space-y-2">
-                <Label>Template Variables</Label>
+              <div className="space-y-3">
+                <Label className="font-medium">Template Variables</Label>
                 {extractVariables(selectedTemplate.components.find((c) => c.type === 'BODY')?.text || '').length === 0 ? (
-                  <p className="text-xs text-gray-500">No variables required for this template.</p>
+                  <p className="text-xs text-gray-500 italic">No variables required for this template.</p>
                 ) : (
                   extractVariables(
                     selectedTemplate.components.find((c) => c.type === 'BODY')?.text || ''
                   ).map((variable) => (
-                    <div key={variable} className="flex items-center gap-2">
-                      <span className="text-sm text-gray-600">{'{{'}{variable}{'}}'}:</span>
+                    <div key={variable} className="flex items-center gap-3">
+                      <span className="text-sm font-mono text-gray-500 w-12 text-right">{'{{'}{variable}{'}}'}</span>
                       <Input
                         value={sendParams[Number(variable)] || ''}
                         onChange={(e) =>
                           setSendParams((prev) => ({ ...prev, [Number(variable)]: e.target.value }))
                         }
+                        placeholder={`Value for variable ${variable}`}
+                        className="flex-1 bg-gray-50 border-gray-200 focus:bg-white transition-all"
                       />
                     </div>
                   ))
@@ -746,7 +780,7 @@ const TemplateManagement = () => {
             <Button variant="outline" onClick={() => setIsSendDialogOpen(false)}>
               Cancel
             </Button>
-            <Button onClick={handleSendTemplate} disabled={isSendingTemplate}>
+            <Button onClick={handleSendTemplate} disabled={isSendingTemplate} className="bg-black text-white hover:bg-gray-800">
               {isSendingTemplate ? (
                 <>
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -755,7 +789,7 @@ const TemplateManagement = () => {
               ) : (
                 <>
                   <Send className="h-4 w-4 mr-2" />
-                  Send
+                  Send Message
                 </>
               )}
             </Button>

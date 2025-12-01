@@ -45,6 +45,9 @@ export const env = {
   MAX_FILE_SIZE: parseInt(process.env.MAX_FILE_SIZE || '10485760', 10),
   ENABLE_REDIS: process.env.ENABLE_REDIS === 'true',
   ENABLE_QUEUES: process.env.ENABLE_QUEUES === 'true',
+  REDIS_HOST: process.env.REDIS_HOST || 'localhost',
+  REDIS_PORT: process.env.REDIS_PORT || '6379',
+  REDIS_PASSWORD: process.env.REDIS_PASSWORD,
 } as const;
 
 export default env;

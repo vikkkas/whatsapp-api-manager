@@ -44,22 +44,63 @@ export async function authenticate(
       role: string;
     };
 
-    // Fetch user to ensure they still exist and are active
-    const user = await prisma.adminUser.findUnique({
-      where: { id: decoded.userId },
-      include: { tenant: true },
+    // Check if session exists and is valid
+    const session = await prisma.session.findUnique({
+      where: { token },
     });
+
+    if (!session) {
+      return res.status(401).json({ error: "Session invalid or expired" });
+    }
+
+    if (session.expiresAt < new Date()) {
+      await prisma.session.delete({ where: { id: session.id } });
+      return res.status(401).json({ error: "Session expired" });
+    }
+
+    // Update last active time (async, don't await)
+    prisma.session.update({
+      where: { id: session.id },
+      data: { lastActiveAt: new Date() },
+    }).catch(err => log.error('Failed to update session activity', { error: err.message }));
+
+    let user: any = null;
+    let tenant: any = null;
+
+    if (decoded.role === 'AGENT') {
+      const agent = await prisma.agent.findUnique({
+        where: { id: decoded.userId },
+        include: { tenant: true },
+      });
+      
+      if (agent) {
+        user = agent;
+        tenant = agent.tenant;
+        // Agents don't have isActive field, assume active if they exist and aren't deleted
+        // You might want to add an isActive field to Agent later
+      }
+    } else {
+      const adminUser = await prisma.adminUser.findUnique({
+        where: { id: decoded.userId },
+        include: { tenant: true },
+      });
+
+      if (adminUser) {
+        user = adminUser;
+        tenant = adminUser.tenant;
+      }
+    }
 
     if (!user) {
       return res.status(401).json({ error: "User not found" });
     }
 
     // Check tenant status
-    if (user.tenant.status === "SUSPENDED") {
+    if (tenant.status === "SUSPENDED") {
       return res.status(403).json({ error: "Account suspended" });
     }
 
-    if (user.tenant.status === "CANCELLED") {
+    if (tenant.status === "CANCELLED") {
       return res.status(403).json({ error: "Account cancelled" });
     }
 
@@ -68,10 +109,10 @@ export async function authenticate(
       userId: user.id,
       tenantId: user.tenantId,
       email: user.email,
-      role: user.role,
+      role: decoded.role, // Use role from token or user.role
     };
 
-    req.tenant = user.tenant;
+    req.tenant = tenant;
 
     next();
   } catch (error: any) {

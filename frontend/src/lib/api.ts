@@ -122,6 +122,21 @@ export const authAPI = {
     return response;
   },
 
+  agentLogin: async (email: string, password: string): Promise<LoginResponse> => {
+    const response = await apiRequest<LoginResponse>('/api/auth/agent-login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    
+    // Store tokens
+    localStorage.setItem('authToken', response.data.token);
+    localStorage.setItem('refreshToken', response.data.refreshToken);
+    localStorage.setItem('user', JSON.stringify(response.data.user));
+    localStorage.setItem('tenant', JSON.stringify(response.data.tenant));
+    
+    return response;
+  },
+
   register: async (email: string, password: string, name: string, tenantName: string, tenantSlug: string): Promise<LoginResponse> => {
     const response = await apiRequest<LoginResponse>('/api/auth/register', {
       method: 'POST',
@@ -347,7 +362,7 @@ export const analyticsAPI = {
 export const contactAPI = {
   list: async (params?: { page?: number; limit?: number; search?: string }) => {
     const query = new URLSearchParams(params as Record<string, string>).toString();
-    return apiRequest<{ contacts: unknown[]; total: number }>(`/api/contacts?${query}`);
+    return apiRequest<{ contacts: any[]; total: number }>(`/api/contacts?${query}`);
   },
 
   get: async (id: string) => {
@@ -388,17 +403,11 @@ export const contactAPI = {
     });
   },
 
-  importCSV: async (formData: FormData) => {
-    const token = localStorage.getItem('authToken');
-    const response = await fetch(`${API_BASE_URL}/api/contacts/import`, {
+  importCSV: async (contacts: any[]) => {
+    return apiRequest('/api/contacts/import/csv', {
       method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${token}`,
-      },
-      body: formData,
+      body: JSON.stringify({ contacts }),
     });
-    if (!response.ok) throw new Error('Import failed');
-    return response.json();
   },
 
   exportCSV: async () => {
@@ -416,15 +425,25 @@ export const contactAPI = {
 
 // Campaign API
 export const campaignAPI = {
-  list: async () => {
-    return apiRequest('/api/campaigns');
+  list: async (params?: { page?: number; limit?: number; status?: string }) => {
+    const query = new URLSearchParams(params as Record<string, string>).toString();
+    return apiRequest<{ campaigns: any[]; total: number }>(`/api/campaigns?${query}`);
+  },
+
+  get: async (id: string) => {
+    return apiRequest(`/api/campaigns/${id}`);
   },
 
   create: async (data: {
     name: string;
-    templateId: string;
-    contacts: string[];
+    description?: string;
+    messageType: 'TEXT' | 'TEMPLATE' | 'INTERACTIVE';
+    templateId?: string;
+    messageText?: string;
+    interactiveType?: 'button' | 'list';
+    interactiveData?: any;
     scheduledAt?: string;
+    contactIds?: string[];
   }) => {
     return apiRequest('/api/campaigns', {
       method: 'POST',
@@ -432,14 +451,153 @@ export const campaignAPI = {
     });
   },
 
-  get: async (id: string) => {
-    return apiRequest(`/api/campaigns/${id}`);
+  update: async (id: string, data: {
+    name?: string;
+    description?: string;
+    status?: string;
+    messageType?: string;
+    templateId?: string;
+    messageText?: string;
+    interactiveType?: string;
+    interactiveData?: any;
+    scheduledAt?: string;
+  }) => {
+    return apiRequest(`/api/campaigns/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
   },
 
-  cancel: async (id: string) => {
-    return apiRequest(`/api/campaigns/${id}/cancel`, {
+  delete: async (id: string) => {
+    return apiRequest(`/api/campaigns/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  addContacts: async (id: string, contactIds: string[]) => {
+    return apiRequest(`/api/campaigns/${id}/contacts`, {
+      method: 'POST',
+      body: JSON.stringify({ contactIds }),
+    });
+  },
+
+  removeContacts: async (id: string, contactIds: string[]) => {
+    return apiRequest(`/api/campaigns/${id}/contacts`, {
+      method: 'DELETE',
+      body: JSON.stringify({ contactIds }),
+    });
+  },
+
+  execute: async (id: string) => {
+    return apiRequest(`/api/campaigns/${id}/execute`, {
       method: 'POST',
     });
+  },
+
+  getAnalytics: async (id: string) => {
+    return apiRequest(`/api/campaigns/${id}/analytics`);
+  },
+};
+
+// Agent API
+export const agentAPI = {
+  list: async (params?: { status?: string }) => {
+    const query = new URLSearchParams(params as Record<string, string>).toString();
+    return apiRequest<{ agents: any[] }>(`/api/agents?${query}`);
+  },
+
+  get: async (id: string) => {
+    return apiRequest(`/api/agents/${id}`);
+  },
+
+  create: async (data: {
+    name: string;
+    email: string;
+    maxConcurrentChats?: number;
+    skills?: string[];
+  }) => {
+    return apiRequest('/api/agents', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  update: async (id: string, data: {
+    name?: string;
+    email?: string;
+    status?: string;
+    maxConcurrentChats?: number;
+    skills?: string[];
+  }) => {
+    return apiRequest(`/api/agents/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiRequest(`/api/agents/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  updateStatus: async (id: string, status: string) => {
+    return apiRequest(`/api/agents/${id}/status`, {
+      method: 'PATCH',
+      body: JSON.stringify({ status }),
+    });
+  },
+
+  getStats: async (id: string) => {
+    return apiRequest(`/api/agents/${id}/stats`);
+  },
+};
+
+// Canned Response API
+export const cannedResponseAPI = {
+  list: async (params?: { category?: string; search?: string }) => {
+    const query = new URLSearchParams(params as Record<string, string>).toString();
+    return apiRequest<{ responses: any[] }>(`/api/canned-responses?${query}`);
+  },
+
+  get: async (id: string) => {
+    return apiRequest(`/api/canned-responses/${id}`);
+  },
+
+  create: async (data: {
+    title: string;
+    content: string;
+    shortcut: string;
+    category?: string;
+    isPublic?: boolean;
+  }) => {
+    return apiRequest('/api/canned-responses', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  update: async (id: string, data: {
+    title?: string;
+    content?: string;
+    shortcut?: string;
+    category?: string;
+    isPublic?: boolean;
+  }) => {
+    return apiRequest(`/api/canned-responses/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiRequest(`/api/canned-responses/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  getCategories: async () => {
+    return apiRequest<{ categories: string[] }>('/api/canned-responses/meta/categories');
   },
 };
 
@@ -478,9 +636,46 @@ export const settingsAPI = {
   },
 };
 
-// Health check
-export const healthAPI = {
-  check: async () => {
-    return apiRequest('/api/health');
+// Flow API
+export const flowAPI = {
+  list: async () => {
+    return apiRequest<{ flows: any[] }>('/api/flows');
+  },
+
+  get: async (id: string) => {
+    return apiRequest(`/api/flows/${id}`);
+  },
+
+  create: async (data: {
+    name: string;
+    description?: string;
+    triggerType: string;
+    trigger?: string;
+  }) => {
+    return apiRequest('/api/flows', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  update: async (id: string, data: {
+    name?: string;
+    description?: string;
+    triggerType?: string;
+    trigger?: string;
+    nodes?: any[];
+    edges?: any[];
+    isActive?: boolean;
+  }) => {
+    return apiRequest(`/api/flows/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiRequest(`/api/flows/${id}`, {
+      method: 'DELETE',
+    });
   },
 };

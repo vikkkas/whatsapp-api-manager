@@ -51,6 +51,9 @@ model Tenant {
   rawWebhookEvents RawWebhookEvent[]
   agents        Agent[]
   contacts      Contact[]
+  campaigns     Campaign[]
+  cannedResponses CannedResponse[]
+  flows         Flow[]
   
   @@index([slug])
   @@index([status])
@@ -76,6 +79,9 @@ model AdminUser {
   lastLoginAt DateTime?
   isActive    Boolean  @default(true)
   
+  agents      Agent[] // Agents linked to this admin user
+  sessions    Session[] // Active sessions
+  
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
@@ -94,20 +100,91 @@ model Agent {
   id       String @id @default(cuid())
   name     String
   email    String
+  password String? // bcrypt hashed password for agent login
   isOnline Boolean @default(false)
   
   tenantId String
   tenant   Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   
   adminUserId String? // Link to AdminUser if agent has login
+  adminUser   AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: SetNull)
+  
+  // Team collaboration features
+  status             AgentStatus @default(OFFLINE)
+  maxConcurrentChats Int @default(10)
+  skills             String[] @default([])
+  
+  // Granular permissions
+  permissions        AgentPermission[] @default([])
   
   assignedConversations Conversation[]
+  sessions           Session[] // Active sessions
   
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   
   @@index([tenantId])
   @@unique([tenantId, email])
+}
+
+enum AgentPermission {
+  // Conversation Management
+  VIEW_CONVERSATIONS
+  SEND_MESSAGES
+  DELETE_MESSAGES
+  ASSIGN_CONVERSATIONS
+  CLOSE_CONVERSATIONS
+  
+  // Contact Management
+  VIEW_CONTACTS
+  CREATE_CONTACTS
+  EDIT_CONTACTS
+  DELETE_CONTACTS
+  EXPORT_CONTACTS
+  
+  // Campaign Management
+  VIEW_CAMPAIGNS
+  CREATE_CAMPAIGNS
+  EDIT_CAMPAIGNS
+  DELETE_CAMPAIGNS
+  EXECUTE_CAMPAIGNS
+  
+  // Template Management
+  VIEW_TEMPLATES
+  CREATE_TEMPLATES
+  EDIT_TEMPLATES
+  DELETE_TEMPLATES
+  
+  // Canned Responses
+  VIEW_CANNED_RESPONSES
+  CREATE_CANNED_RESPONSES
+  EDIT_CANNED_RESPONSES
+  DELETE_CANNED_RESPONSES
+  
+  // Analytics
+  VIEW_ANALYTICS
+  EXPORT_ANALYTICS
+  
+  // Settings
+  VIEW_SETTINGS
+  EDIT_SETTINGS
+  
+  // Agent Management (for senior agents)
+  VIEW_AGENTS
+  MANAGE_AGENTS
+
+  // Flow Builder
+  VIEW_FLOWS
+  CREATE_FLOWS
+  EDIT_FLOWS
+  DELETE_FLOWS
+}
+
+enum AgentStatus {
+  ONLINE
+  AWAY
+  BUSY
+  OFFLINE
 }
 
 // ============================================
@@ -201,6 +278,10 @@ model Conversation {
   assignedAgentId String?
   assignedAgent   Agent? @relation(fields: [assignedAgentId], references: [id], onDelete: SetNull)
   
+  // Campaign relation
+  campaignId    String?
+  campaign      Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  
   // Status
   status        ConversationStatus @default(OPEN)
   unreadCount   Int      @default(0)
@@ -209,6 +290,9 @@ model Conversation {
   lastMessageAt DateTime @default(now())
   tags          String[] // For filtering/categorization
   notes         String?  // Agent notes
+  labels        String[] @default([]) // Custom labels for organization
+  priority      Priority @default(NORMAL)
+  snoozedUntil  DateTime?
   
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
@@ -221,6 +305,7 @@ model Conversation {
   @@index([status])
   @@index([assignedAgentId])
   @@index([lastMessageAt])
+  @@index([campaignId])
 }
 
 enum ConversationStatus {
@@ -228,6 +313,13 @@ enum ConversationStatus {
   PENDING
   RESOLVED
   ARCHIVED
+}
+
+enum Priority {
+  LOW
+  NORMAL
+  HIGH
+  URGENT
 }
 
 model Message {
@@ -324,6 +416,10 @@ model Contact {
   notes        String?  @db.Text
   tags         String[] @default([])
   
+  // Campaign relation
+  campaignId   String?
+  campaign     Campaign? @relation(fields: [campaignId], references: [id], onDelete: SetNull)
+  
   // Relations
   conversations Conversation[] @relation("ContactConversations")
   
@@ -333,6 +429,7 @@ model Contact {
   @@unique([tenantId, phoneNumber])
   @@index([tenantId])
   @@index([phoneNumber])
+  @@index([campaignId])
 }
 
 // ============================================
@@ -384,6 +481,88 @@ enum TemplateStatus {
 }
 
 // ============================================
+// CAMPAIGNS
+// ============================================
+
+model Campaign {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  name        String
+  description String?  @db.Text
+  
+  // Campaign settings
+  status      CampaignStatus @default(DRAFT)
+  
+  // Message configuration
+  messageType MessageType @default(TEMPLATE)
+  templateId  String?     // Reference to Template if using template
+  messageText String?     @db.Text // For text messages
+  mediaUrl    String?     // For media messages
+  
+  // Interactive message components (buttons, lists, etc.)
+  interactiveType String?  // button, list, product, product_list
+  interactiveData Json?    // Stores button/list configurations
+  
+  // Scheduling
+  scheduledAt DateTime?
+  startedAt   DateTime?
+  completedAt DateTime?
+  
+  // Statistics
+  totalContacts     Int @default(0)
+  messagesSent      Int @default(0)
+  messagesDelivered Int @default(0)
+  messagesFailed    Int @default(0)
+  messagesRead      Int @default(0)
+  
+  // Relations
+  contacts      Contact[]
+  conversations Conversation[]
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([status])
+  @@index([scheduledAt])
+}
+
+enum CampaignStatus {
+  DRAFT
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  PAUSED
+  CANCELLED
+}
+
+// ============================================
+// CANNED RESPONSES (Quick Replies)
+// ============================================
+
+model CannedResponse {
+  id        String   @id @default(cuid())
+  tenantId  String
+  tenant    Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  
+  title     String
+  content   String   @db.Text
+  shortcut  String   // e.g., "/welcome", "/thanks"
+  category  String?
+  isPublic  Boolean  @default(true) // Available to all agents
+  
+  createdById String?
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([tenantId])
+  @@index([shortcut])
+}
+
+// ============================================
 // USAGE & ANALYTICS (for billing & dashboards)
 // ============================================
 
@@ -404,4 +583,71 @@ model DailyUsage {
   
   @@unique([tenantId, date])
   @@index([tenantId, date])
+}
+
+// ============================================
+// SESSION MANAGEMENT
+// ============================================
+
+model Session {
+  id        String   @id @default(cuid())
+  token     String   @unique // The JWT token string
+  
+  // Relations (Optional to support both AdminUser and Agent)
+  adminUserId String?
+  adminUser   AdminUser? @relation(fields: [adminUserId], references: [id], onDelete: Cascade)
+  
+  agentId     String?
+  agent       Agent?     @relation(fields: [agentId], references: [id], onDelete: Cascade)
+  
+  // Session details
+  expiresAt    DateTime
+  ipAddress    String?
+  userAgent    String?
+  
+  createdAt    DateTime @default(now())
+  lastActiveAt DateTime @default(now())
+  
+  @@index([adminUserId])
+  @@index([agentId])
+  @@index([token])
+}
+
+// ============================================
+// FLOW BUILDER
+// ============================================
+
+model Flow {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  
+  // Trigger configuration
+  triggerType FlowTriggerType @default(KEYWORD)
+  trigger     String?         // Keyword or other trigger data
+  
+  // Flow structure (React Flow format)
+  nodes       Json     // Array of nodes
+  edges       Json     // Array of edges
+  
+  isActive    Boolean  @default(false)
+  
+  // Analytics
+  runsCount   Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([isActive])
+}
+
+enum FlowTriggerType {
+  KEYWORD
+  NEW_MESSAGE
+  CONVERSATION_OPENED
+  MANUAL
 }

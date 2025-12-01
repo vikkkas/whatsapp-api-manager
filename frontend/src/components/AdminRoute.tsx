@@ -18,7 +18,7 @@ const AdminRoute: React.FC<AdminRouteProps> = ({ children }) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  if (!currentUser || currentUser.role !== 'admin') {
+  if (!currentUser || currentUser.role !== 'TENANT_ADMIN') {
     // Show access denied for non-admin users
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
