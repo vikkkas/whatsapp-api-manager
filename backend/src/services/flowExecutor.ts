@@ -1,0 +1,105 @@
+import prisma from '../config/prisma.js';
+import { log } from '../utils/logger.js';
+import { getMetaAPIForTenant } from './metaAPI.js';
+
+export class FlowExecutor {
+  async executeTrigger(tenantId: string, triggerType: 'KEYWORD' | 'NEW_MESSAGE' | 'CONVERSATION_OPENED', data: any) {
+    try {
+      // Find active flows matching the trigger
+      const flows = await prisma.flow.findMany({
+        where: {
+          tenantId,
+          isActive: true,
+          triggerType,
+        }
+      });
+
+      // Filter for keywords if needed
+      const matchingFlows = flows.filter(flow => {
+        if (triggerType !== 'KEYWORD') return true;
+        if (!flow.trigger) return false;
+        // Simple case-insensitive match
+        const messageBody = data.messageBody || '';
+        return messageBody.toLowerCase().includes(flow.trigger.toLowerCase());
+      });
+
+      for (const flow of matchingFlows) {
+        await this.executeFlow(flow, data);
+      }
+    } catch (error) {
+      log.error('Error executing flow trigger', { error });
+    }
+  }
+
+  async executeFlow(flow: any, context: any) {
+    log.info(`Executing flow ${flow.name} (${flow.id})`);
+    
+    // Increment run count
+    await prisma.flow.update({
+      where: { id: flow.id },
+      data: { runsCount: { increment: 1 } }
+    });
+
+    // Find Start Node
+    const nodes = Array.isArray(flow.nodes) ? flow.nodes : [];
+    const edges = Array.isArray(flow.edges) ? flow.edges : [];
+    const startNode = nodes.find((n: any) => n.type === 'start');
+
+    if (!startNode) {
+      log.warn(`Flow ${flow.id} has no start node`);
+      return;
+    }
+
+    // Traverse
+    await this.processNode(startNode, nodes, edges, context, flow.tenantId);
+  }
+
+  async processNode(node: any, nodes: any[], edges: any[], context: any, tenantId: string) {
+    // Process current node action
+    if (node.type === 'message') {
+       await this.sendMessage(node, context, tenantId);
+    }
+
+    // Find next nodes
+    const outgoingEdges = edges.filter((e: any) => e.source === node.id);
+    
+    for (const edge of outgoingEdges) {
+      const nextNode = nodes.find((n: any) => n.id === edge.target);
+      if (nextNode) {
+        // Add small delay to ensure order
+        await new Promise(resolve => setTimeout(resolve, 500));
+        await this.processNode(nextNode, nodes, edges, context, tenantId);
+      }
+    }
+  }
+
+  async sendMessage(node: any, context: any, tenantId: string) {
+    const { content, mediaUrl, buttons } = node.data;
+    const contactPhone = context.contactPhone || context.from; 
+
+    if (!contactPhone) {
+      log.error('No contact phone in context for flow execution');
+      return;
+    }
+
+    try {
+      const metaAPI = await getMetaAPIForTenant(tenantId);
+
+      if (buttons && buttons.length > 0) {
+        // Send interactive message
+        await metaAPI.sendQuickReplyButtons(
+          contactPhone,
+          content || 'Please select an option:',
+          buttons.map((b: any, i: number) => ({ id: b.id || `btn-${i}`, title: b.label })),
+        );
+      } else {
+        // Send text
+        if (content) await metaAPI.sendTextMessage(contactPhone, content);
+      }
+    } catch (error) {
+      log.error('Failed to send flow message', { error });
+    }
+  }
+}
+
+export const flowExecutor = new FlowExecutor();

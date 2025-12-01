@@ -320,6 +320,45 @@ async function processInboundMessage(
   });
 
   log.info('Inbound message saved', { waMessageId, conversationId: conversation.id });
+
+  // ==========================================
+  // EXECUTE AUTOMATION FLOWS
+  // ==========================================
+  try {
+    const { flowExecutor } = await import('../services/flowExecutor.js');
+    
+    // 1. Keyword Trigger
+    if (messageType === 'TEXT' && text) {
+      await flowExecutor.executeTrigger(tenantId, 'KEYWORD', {
+        messageBody: text,
+        contactPhone: normalizedFrom,
+        from: normalizedFrom,
+        contactId: contact.id,
+        conversationId: conversation.id
+      });
+    }
+
+    // 2. New Message Trigger (Any message)
+    await flowExecutor.executeTrigger(tenantId, 'NEW_MESSAGE', {
+      messageBody: text,
+      contactPhone: normalizedFrom,
+      from: normalizedFrom,
+      contactId: contact.id,
+      conversationId: conversation.id
+    });
+
+    // 3. Conversation Opened Trigger
+    if (isNewConversation) {
+      await flowExecutor.executeTrigger(tenantId, 'CONVERSATION_OPENED', {
+        contactPhone: normalizedFrom,
+        from: normalizedFrom,
+        contactId: contact.id,
+        conversationId: conversation.id
+      });
+    }
+  } catch (error) {
+    log.error('Error executing flows', { error });
+  }
 }
 
 /**

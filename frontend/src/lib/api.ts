@@ -216,7 +216,7 @@ export const messageAPI = {
   send: async (data: {
     phoneNumberId: string;
     to: string;
-    type: 'text' | 'image' | 'video' | 'audio' | 'document' | 'template';
+    type: 'text' | 'image' | 'video' | 'audio' | 'document' | 'template' | 'interactive';
     text?: string;
     mediaUrl?: string;
     caption?: string;
@@ -224,6 +224,7 @@ export const messageAPI = {
     templateName?: string;
     languageCode?: string;
     templateComponents?: unknown[];
+    interactive?: any;
   }) => {
     return apiRequest<Message>('/api/messages', {
       method: 'POST',
@@ -236,6 +237,30 @@ export const messageAPI = {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
+  },
+};
+
+// Media API
+export const mediaAPI = {
+  upload: async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    
+    const token = localStorage.getItem('authToken');
+    const response = await fetch(`${API_BASE_URL}/api/media/upload`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`,
+      },
+      body: formData,
+    });
+    
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.error || 'Upload failed');
+    }
+    
+    return response.json();
   },
 };
 
