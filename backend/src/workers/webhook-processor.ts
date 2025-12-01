@@ -322,23 +322,25 @@ async function processInboundMessage(
   log.info('Inbound message saved', { waMessageId, conversationId: conversation.id });
 
   // ==========================================
-  // TRIGGER AUTOMATION FLOWS (ASYNC via Queue)
+  // TRIGGER AUTOMATION FLOWS (Outbox Pattern)
   // ==========================================
   try {
-    const { triggerFlows, handleButtonClick } = await import('../queues/flowExecutionQueue.js');
+    const { triggerFlows, handleButtonClick } = await import('../services/flowExecutionService.js');
     
     // Check if this is a button response
     const isButtonResponse = messageType === 'INTERACTIVE' && message.interactive?.type === 'button_reply';
     
     if (isButtonResponse) {
-      // Handle button click
+      // Handle button click - creates execution record
       const buttonId = message.interactive.button_reply.id;
       await handleButtonClick(tenantId, normalizedFrom, buttonId, {
         contactId: contact.id,
         conversationId: conversation.id,
       });
+      
+      log.info('Button click execution created', { buttonId });
     } else {
-      // Regular message triggers
+      // Regular message triggers - create execution records
       
       // 1. Keyword Trigger (for text messages)
       if (messageType === 'TEXT' && text) {
@@ -370,16 +372,15 @@ async function processInboundMessage(
           conversationId: conversation.id,
         });
       }
+      
+      log.info('Flow executions created', { 
+        tenantId, 
+        isNewConversation 
+      });
     }
-    
-    log.info('Flow triggers queued successfully', { 
-      tenantId, 
-      isButtonResponse,
-      isNewConversation 
-    });
   } catch (error) {
-    log.error('Error queueing flow triggers', { error });
-    // Don't throw - webhook processing should continue even if flow queueing fails
+    log.error('Error creating flow executions', { error });
+    // Don't throw - webhook processing should continue
   }
 }
 

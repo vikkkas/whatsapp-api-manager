@@ -8,6 +8,10 @@ const logger = winston.createLogger({
   transports: [new winston.transports.Console()],
 });
 
+// Parse Redis URL to check if it's Redis Cloud (rediss://)
+const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
+const isRedisCloud = redisUrl.startsWith('rediss://');
+
 const redisConfig: RedisOptions = {
   maxRetriesPerRequest: null, // Required for BullMQ
   enableReadyCheck: false,
@@ -20,17 +24,23 @@ const redisConfig: RedisOptions = {
     const delay = Math.min(times * 1000, 3000);
     return delay;
   },
+  // Redis Cloud requires TLS
+  ...(isRedisCloud && {
+    tls: {
+      rejectUnauthorized: false, // Required for some Redis Cloud providers
+    },
+  }),
 };
 
 // Create Redis connection
-const redis = new Redis(process.env.REDIS_URL || 'redis://localhost:6379', redisConfig);
+const redis = new Redis(redisUrl, redisConfig);
 
 redis.on('connect', () => {
-  logger.info('Redis connected');
+  logger.info('Redis connected', { isRedisCloud });
 });
 
 redis.on('error', (err: Error) => {
-  logger.error('Redis connection error', { error: err.message });
+  logger.error('Redis connection error', { error: err.message, url: redisUrl.replace(/:[^:@]+@/, ':****@') });
 });
 
 redis.on('ready', () => {
@@ -47,5 +57,5 @@ export default redis;
 
 // Create a duplicate connection for BullMQ (it requires separate connections)
 export const createRedisConnection = (): Redis => {
-  return new Redis(process.env.REDIS_URL || 'redis://localhost:6379', redisConfig);
+  return new Redis(redisUrl, redisConfig);
 };
