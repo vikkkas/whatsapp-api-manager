@@ -148,7 +148,12 @@ router.get('/:id', requirePermission('VIEW_TEMPLATES'), async (req: Request, res
 
 router.post('/', requirePermission('CREATE_TEMPLATE'), async (req: Request, res: Response) => {
   try {
-    const payload = createTemplateSchema.parse(req.body);
+    const payload = createTemplateSchema.parse(req.body) as {
+      name: string;
+      category: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+      language: string;
+      components: any[];
+    };
     const tenantId = req.user!.tenantId;
     const template = await createTemplateForTenant(tenantId, payload);
 
@@ -168,7 +173,12 @@ router.post('/', requirePermission('CREATE_TEMPLATE'), async (req: Request, res:
 
 router.patch('/:id', requirePermission('EDIT_TEMPLATE'), async (req: Request, res: Response) => {
   try {
-    const payload = updateTemplateSchema.parse(req.body);
+    const payload = updateTemplateSchema.parse(req.body) as {
+      name?: string;
+      category?: 'MARKETING' | 'UTILITY' | 'AUTHENTICATION';
+      language?: string;
+      components?: any[];
+    };
     const tenantId = req.user!.tenantId;
     const template = await updateTemplateForTenant(tenantId, req.params.id, payload);
 

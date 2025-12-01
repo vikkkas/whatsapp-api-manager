@@ -328,11 +328,11 @@ async function processInboundMessage(
     const { triggerFlows, handleButtonClick } = await import('../services/flowExecutionService.js');
     
     // Check if this is a button response
-    const isButtonResponse = messageType === 'INTERACTIVE' && message.interactive?.type === 'button_reply';
+    const isButtonResponse = messageType === 'INTERACTIVE' && messageData.interactive?.type === 'button_reply';
     
     if (isButtonResponse) {
       // Handle button click - creates execution record
-      const buttonId = message.interactive.button_reply.id;
+      const buttonId = messageData.interactive.button_reply.id;
       await handleButtonClick(tenantId, normalizedFrom, buttonId, {
         contactId: contact.id,
         conversationId: conversation.id,

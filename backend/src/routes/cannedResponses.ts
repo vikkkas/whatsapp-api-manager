@@ -102,7 +102,7 @@ router.get('/:id', requirePermission('VIEW_CANNED_RESPONSES'), async (req: Reque
 router.post('/', requirePermission('CREATE_CANNED_RESPONSE'), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
-    const userId = req.user!.id;
+    const userId = req.user!.userId;
     const data = createCannedResponseSchema.parse(req.body);
 
     // Check if shortcut already exists
