@@ -322,42 +322,64 @@ async function processInboundMessage(
   log.info('Inbound message saved', { waMessageId, conversationId: conversation.id });
 
   // ==========================================
-  // EXECUTE AUTOMATION FLOWS
+  // TRIGGER AUTOMATION FLOWS (ASYNC via Queue)
   // ==========================================
   try {
-    const { flowExecutor } = await import('../services/flowExecutor.js');
+    const { triggerFlows, handleButtonClick } = await import('../queues/flowExecutionQueue.js');
     
-    // 1. Keyword Trigger
-    if (messageType === 'TEXT' && text) {
-      await flowExecutor.executeTrigger(tenantId, 'KEYWORD', {
+    // Check if this is a button response
+    const isButtonResponse = messageType === 'INTERACTIVE' && message.interactive?.type === 'button_reply';
+    
+    if (isButtonResponse) {
+      // Handle button click
+      const buttonId = message.interactive.button_reply.id;
+      await handleButtonClick(tenantId, normalizedFrom, buttonId, {
+        contactId: contact.id,
+        conversationId: conversation.id,
+      });
+    } else {
+      // Regular message triggers
+      
+      // 1. Keyword Trigger (for text messages)
+      if (messageType === 'TEXT' && text) {
+        await triggerFlows(tenantId, 'KEYWORD', {
+          contactPhone: normalizedFrom,
+          messageBody: text,
+          messageType,
+          contactId: contact.id,
+          conversationId: conversation.id,
+        });
+      }
+
+      // 2. New Message Trigger (any message type)
+      await triggerFlows(tenantId, 'NEW_MESSAGE', {
+        contactPhone: normalizedFrom,
         messageBody: text,
-        contactPhone: normalizedFrom,
-        from: normalizedFrom,
+        messageType,
         contactId: contact.id,
-        conversationId: conversation.id
+        conversationId: conversation.id,
       });
-    }
 
-    // 2. New Message Trigger (Any message)
-    await flowExecutor.executeTrigger(tenantId, 'NEW_MESSAGE', {
-      messageBody: text,
-      contactPhone: normalizedFrom,
-      from: normalizedFrom,
-      contactId: contact.id,
-      conversationId: conversation.id
+      // 3. Conversation Opened Trigger (first message only)
+      if (isNewConversation) {
+        await triggerFlows(tenantId, 'CONVERSATION_OPENED', {
+          contactPhone: normalizedFrom,
+          messageBody: text,
+          messageType,
+          contactId: contact.id,
+          conversationId: conversation.id,
+        });
+      }
+    }
+    
+    log.info('Flow triggers queued successfully', { 
+      tenantId, 
+      isButtonResponse,
+      isNewConversation 
     });
-
-    // 3. Conversation Opened Trigger
-    if (isNewConversation) {
-      await flowExecutor.executeTrigger(tenantId, 'CONVERSATION_OPENED', {
-        contactPhone: normalizedFrom,
-        from: normalizedFrom,
-        contactId: contact.id,
-        conversationId: conversation.id
-      });
-    }
   } catch (error) {
-    log.error('Error executing flows', { error });
+    log.error('Error queueing flow triggers', { error });
+    // Don't throw - webhook processing should continue even if flow queueing fails
   }
 }
 

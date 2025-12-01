@@ -186,6 +186,13 @@ import('./services/scheduler.js').then(({ campaignScheduler }) => {
   log.error('Failed to start campaign scheduler', { error });
 });
 
+// Start flow executor worker
+import('./workers/flow-executor.js').then(() => {
+  log.info('🔄 Flow executor worker initialized');
+}).catch((error) => {
+  log.error('Failed to start flow executor worker', { error });
+});
+
 const server = httpServer.listen(PORT, () => {
   log.info(`🚀 Server started on port ${PORT}`);
   log.info(`📝 Environment: ${env.NODE_ENV}`);
