@@ -233,24 +233,61 @@ const ContactManagement = () => {
     }
   };
 
+  const parseCSV = (text: string) => {
+    const lines = text.split('\n');
+    const headers = lines[0].split(',').map(h => h.trim().replace(/^"|"$/g, '')); // Remove quotes
+    const result = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      if (!lines[i].trim()) continue;
+      const obj: any = {};
+      // Split by comma, ignoring commas inside quotes
+      const currentline = lines[i].split(/,(?=(?:(?:[^"]*"){2})*[^"]*$)/).map(val => val.trim().replace(/^"|"$/g, ''));
+
+      for (let j = 0; j < headers.length; j++) {
+        if (headers[j]) {
+          obj[headers[j]] = currentline[j];
+        }
+      }
+      result.push(obj);
+    }
+    return result;
+  };
+
   const handleImportCSV = async () => {
     if (!importFile) {
       toast.error('Please select a CSV file');
       return;
     }
 
-    try {
-      const formData = new FormData();
-      formData.append('file', importFile);
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+      const text = e.target?.result as string;
+      try {
+        const contacts = parseCSV(text);
+        if (contacts.length === 0) {
+          toast.error('No contacts found in CSV');
+          return;
+        }
+        
+        // Validate required fields
+        const validContacts = contacts.filter((c: any) => c.phoneNumber);
+        if (validContacts.length === 0) {
+           toast.error('No valid contacts found. "phoneNumber" column is required.');
+           return;
+        }
 
-      await contactAPI.importCSV(formData);
-      toast.success('Contacts imported successfully');
-      setIsImportDialogOpen(false);
-      setImportFile(null);
-      fetchContacts();
-    } catch (error) {
-      toast.error('Failed to import contacts');
-    }
+        await contactAPI.importCSV(validContacts);
+        toast.success(`${validContacts.length} contacts imported successfully`);
+        setIsImportDialogOpen(false);
+        setImportFile(null);
+        fetchContacts();
+      } catch (error) {
+        console.error('Import error:', error);
+        toast.error('Failed to import contacts');
+      }
+    };
+    reader.readAsText(importFile);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {

@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import { z } from 'zod';
 import prisma from '../config/prisma.js';
 import { authenticate } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import { enforceTenantIsolation } from '../middleware/tenant.js';
 import { log } from '../utils/logger.js';
 import { broadcastConversationUpdate } from '../services/websocket.js';
@@ -19,6 +20,7 @@ const listConversationsSchema = z.object({
   status: z.enum(['OPEN', 'RESOLVED', 'ARCHIVED']).optional(),
   search: z.string().optional(),
   assignedTo: z.string().optional(),
+  campaignId: z.string().optional(),
 });
 
 const updateConversationSchema = z.object({
@@ -32,7 +34,7 @@ const updateConversationSchema = z.object({
  * GET /api/conversations
  * List conversations with filters and pagination
  */
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', requirePermission('VIEW_CONVERSATIONS'), async (req: Request, res: Response) => {
   try {
     const query = listConversationsSchema.parse(req.query);
     const tenantId = req.user!.tenantId;
@@ -45,6 +47,10 @@ router.get('/', async (req: Request, res: Response) => {
 
     if (query.assignedTo) {
       where.assignedTo = query.assignedTo;
+    }
+
+    if (query.campaignId) {
+      where.campaignId = query.campaignId;
     }
 
     if (query.search) {
@@ -65,6 +71,13 @@ router.get('/', async (req: Request, res: Response) => {
               id: true,
               name: true,
               email: true,
+            },
+          },
+          campaign: {
+            select: {
+              id: true,
+              name: true,
+              status: true,
             },
           },
           _count: {
@@ -116,7 +129,7 @@ router.get('/', async (req: Request, res: Response) => {
  * GET /api/conversations/:id
  * Get conversation with all messages
  */
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', requirePermission('VIEW_CONVERSATIONS'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const tenantId = req.user!.tenantId;
@@ -171,7 +184,7 @@ router.get('/:id', async (req: Request, res: Response) => {
  * PATCH /api/conversations/:id
  * Update conversation
  */
-router.patch('/:id', async (req: Request, res: Response) => {
+router.patch('/:id', requirePermission('SEND_MESSAGES'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const tenantId = req.user!.tenantId;
@@ -248,7 +261,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
  * DELETE /api/conversations/:id
  * Archive a conversation
  */
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requirePermission('CLOSE_CONVERSATIONS'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const tenantId = req.user!.tenantId;

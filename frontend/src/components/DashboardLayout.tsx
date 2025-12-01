@@ -2,9 +2,8 @@ import { ReactNode } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
-import { Button } from "./ui/button";
 import { authAPI } from "@/lib/api";
-import { ShieldCheck, Sparkles } from "lucide-react";
+import { Sparkles } from "lucide-react";
 
 interface DashboardLayoutProps {
   children: ReactNode;
@@ -17,6 +16,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
   const navLinks = [
     { label: 'Inbox', path: '/inbox' },
+    { label: 'Contacts', path: '/contacts' },
+    { label: 'Campaigns', path: '/campaigns' },
+    { label: 'Quick Replies', path: '/canned-responses' },
     { label: 'Templates', path: '/templates' },
     { label: 'Analytics', path: '/analytics' },
     { label: 'Settings', path: '/settings' },
@@ -46,7 +48,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                   </span>
                 )}
                 
-                <div className="flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
+                <div className="hidden lg:flex items-center gap-1 bg-gray-100 p-1 rounded-lg">
                   {navLinks.map((nav) => {
                     const isActive = location.pathname.startsWith(nav.path);
                     return (
@@ -62,8 +64,7 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
                         {nav.label}
                       </Link>
                     );
-                  })}
-                </div>
+                  })}</div>
               </div>
             </div>
           </header>

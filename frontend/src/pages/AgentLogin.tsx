@@ -1,12 +1,12 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { Loader2, Lock, Mail, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { Loader2, Lock, Mail, ArrowRight, CheckCircle2, UserCog } from 'lucide-react';
 import { authAPI } from '../lib/api';
 
-const Login = () => {
+const AgentLogin = () => {
   const [credentials, setCredentials] = useState({
-    email: 'admin@demo.com',
-    password: 'admin123'
+    email: '',
+    password: ''
   });
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -26,10 +26,18 @@ const Login = () => {
     setError('');
 
     try {
-      const response = await authAPI.login(credentials.email, credentials.password);
-      console.log('Login successful:', response.data.user);
+      const response = await authAPI.agentLogin(credentials.email, credentials.password);
       
-      if (window.location.pathname !== '/inbox') {
+      // Save auth data
+      localStorage.setItem('authToken', response.data.token);
+      localStorage.setItem('refreshToken', response.data.refreshToken);
+      localStorage.setItem('user', JSON.stringify(response.data.user));
+      localStorage.setItem('tenant', JSON.stringify(response.data.tenant));
+
+      if (response.data.mustChangePassword) {
+        // TODO: Redirect to password change page
+        navigate('/inbox'); // For now, go to inbox
+      } else {
         navigate('/inbox');
       }
     } catch (error) {
@@ -68,15 +76,15 @@ const Login = () => {
 
         <div className="relative z-10">
           <h2 className="text-5xl font-black leading-tight mb-8">
-            Welcome back to<br />
-            your dashboard
+            Agent Portal<br />
+            Access
           </h2>
           <div className="space-y-6">
             {[
-              'Manage your conversations',
-              'View real-time analytics',
-              'Update automation flows',
-              'Monitor team performance'
+              'Handle customer conversations',
+              'Access assigned contacts',
+              'Manage support tickets',
+              'View your performance stats'
             ].map((feature, index) => (
               <div key={index} className="flex items-center gap-4 text-gray-300">
                 <div className="w-6 h-6 rounded-full bg-yellow-400 flex items-center justify-center text-black">
@@ -106,8 +114,13 @@ const Login = () => {
           </div>
 
           <div className="mb-10">
-            <h2 className="text-3xl font-black text-black mb-2">Sign in</h2>
-            <p className="text-gray-500 font-medium">Access your account</p>
+            <div className="flex items-center gap-3 mb-2">
+              <div className="p-2 bg-yellow-100 rounded-lg">
+                <UserCog className="h-6 w-6 text-yellow-700" />
+              </div>
+              <h2 className="text-3xl font-black text-black">Agent Login</h2>
+            </div>
+            <p className="text-gray-500 font-medium">Sign in to your support dashboard</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -119,7 +132,7 @@ const Login = () => {
 
             <div>
               <label className="block text-sm font-bold text-black mb-2">
-                Email address
+                Agent Email
               </label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
@@ -130,7 +143,7 @@ const Login = () => {
                   value={credentials.email}
                   onChange={handleInputChange}
                   className="w-full pl-10 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-0 focus:border-black outline-none transition-all font-medium"
-                  placeholder="you@company.com"
+                  placeholder="agent@company.com"
                 />
               </div>
             </div>
@@ -165,7 +178,7 @@ const Login = () => {
                 </>
               ) : (
                 <>
-                  Sign in
+                  Sign in as Agent
                   <ArrowRight className="h-5 w-5" />
                 </>
               )}
@@ -174,22 +187,11 @@ const Login = () => {
 
           <div className="mt-8 text-center space-y-4">
             <p className="text-sm font-medium text-gray-500">
-              Don't have an account?{' '}
-              <Link to="/signup" className="text-black font-bold hover:underline">
-                Create free account
+              Not an agent?{' '}
+              <Link to="/login" className="text-black font-bold hover:underline">
+                Admin Login
               </Link>
             </p>
-
-            <p className="text-sm font-medium text-gray-500">
-              Are you an agent?{' '}
-              <Link to="/agent-login" className="text-black font-bold hover:underline">
-                Agent Login
-              </Link>
-            </p>
-            
-            <div className="text-xs text-gray-400">
-              Demo credentials: admin@demo.com / admin123
-            </div>
           </div>
         </div>
       </div>
@@ -197,4 +199,4 @@ const Login = () => {
   );
 };
 
-export default Login;
+export default AgentLogin;

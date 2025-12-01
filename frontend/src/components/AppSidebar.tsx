@@ -1,4 +1,4 @@
-import { MessageSquare, FileText, Settings, LogOut, User, BarChart3, Zap, Users } from "lucide-react";
+import { MessageSquare, FileText, Settings, LogOut, User, BarChart3, Zap, Users, Target, UserCog } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -15,14 +15,17 @@ import {
 import { authAPI } from "@/lib/api";
 import { Button } from "./ui/button";
 import { useState, useMemo } from "react";
+import { usePermissions } from "@/hooks/usePermissions";
 
 const items = [
-  { title: "Inbox", url: "/inbox", icon: MessageSquare },
-  { title: "Contacts", url: "/contacts", icon: Users },
-  // { title: "Automation", url: "/templates", icon: Zap },
-  { title: "Templates", url: "/templates", icon: FileText },
-  { title: "Analytics", url: "/analytics", icon: BarChart3 },
-  { title: "Settings", url: "/settings", icon: Settings },
+  { title: "Inbox", url: "/inbox", icon: MessageSquare, permission: 'VIEW_CONVERSATIONS' },
+  { title: "Contacts", url: "/contacts", icon: Users, permission: 'VIEW_CONTACTS' },
+  { title: "Campaigns", url: "/campaigns", icon: Target, permission: 'VIEW_CAMPAIGNS' },
+  { title: "Templates", url: "/templates", icon: FileText, permission: 'VIEW_TEMPLATES' },
+  { title: "Quick Replies", url: "/canned-responses", icon: Zap, permission: 'VIEW_CANNED_RESPONSES' },
+  { title: "Analytics", url: "/analytics", icon: BarChart3, permission: 'VIEW_ANALYTICS' },
+  { title: "Agents", url: "/agents", icon: UserCog, adminOnly: true },
+  { title: "Settings", url: "/settings", icon: Settings, permission: 'VIEW_SETTINGS' },
 ];
 
 export function AppSidebar() {
@@ -47,7 +50,11 @@ export function AppSidebar() {
     setIsLoggingOut(true);
     try {
       await authAPI.logout();
-      navigate('/login');
+      if (currentUser?.role === 'AGENT') {
+        navigate('/agent-login');
+      } else {
+        navigate('/login');
+      }
     } catch (error) {
       console.error('Logout error:', error);
       navigate('/login');
@@ -55,6 +62,24 @@ export function AppSidebar() {
       setIsLoggingOut(false);
     }
   };
+
+  const { hasPermission, isTenantAdmin } = usePermissions();
+
+  // Filter items based on permissions
+  const visibleItems = useMemo(() => {
+    return items.filter(item => {
+      // Admin-only items
+      if (item.adminOnly) {
+        return isTenantAdmin();
+      }
+      // Permission-based items
+      if (item.permission) {
+        return hasPermission(item.permission);
+      }
+      // Items without restrictions
+      return true;
+    });
+  }, [hasPermission, isTenantAdmin]);
 
   return (
     <Sidebar
@@ -88,7 +113,7 @@ export function AppSidebar() {
         <SidebarGroup>
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
-              {items.map((item) => (
+              {visibleItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild className="group/menu-button rounded-lg ring-0 outline-none h-auto text-yellow-100 p-2 border-none">
                     <NavLink

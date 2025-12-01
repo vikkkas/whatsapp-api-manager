@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import { z } from 'zod';
 import prisma from '../config/prisma.js';
 import { authenticate } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import { enforceTenantIsolation } from '../middleware/tenant.js';
 import { log } from '../utils/logger.js';
 import {
@@ -52,7 +53,7 @@ const listQuerySchema = z.object({
   sync: z.enum(['true', 'false', '1', '0']).optional(),
 });
 
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', requirePermission('VIEW_TEMPLATES'), async (req: Request, res: Response) => {
   try {
     const query = listQuerySchema.parse(req.query);
     const tenantId = req.user!.tenantId;
@@ -109,7 +110,7 @@ router.get('/', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/sync', async (req: Request, res: Response) => {
+router.post('/sync', requirePermission('EDIT_TEMPLATE'), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
     const result = await syncTemplatesWithMeta(tenantId);
@@ -124,7 +125,7 @@ router.post('/sync', async (req: Request, res: Response) => {
   }
 });
 
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', requirePermission('VIEW_TEMPLATES'), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
     const template = await prisma.template.findFirst({
@@ -145,7 +146,7 @@ router.get('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requirePermission('CREATE_TEMPLATE'), async (req: Request, res: Response) => {
   try {
     const payload = createTemplateSchema.parse(req.body);
     const tenantId = req.user!.tenantId;
@@ -165,7 +166,7 @@ router.post('/', async (req: Request, res: Response) => {
   }
 });
 
-router.patch('/:id', async (req: Request, res: Response) => {
+router.patch('/:id', requirePermission('EDIT_TEMPLATE'), async (req: Request, res: Response) => {
   try {
     const payload = updateTemplateSchema.parse(req.body);
     const tenantId = req.user!.tenantId;
@@ -185,7 +186,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
   }
 });
 
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requirePermission('DELETE_TEMPLATE'), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
     await deleteTemplateForTenant(tenantId, req.params.id);

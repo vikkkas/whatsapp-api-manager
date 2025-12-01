@@ -1,6 +1,7 @@
 import { Router, Request, Response } from 'express';
 import prisma from '../config/prisma.js';
 import { authenticate } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import { enforceTenantIsolation } from '../middleware/tenant.js';
 
 const router = Router();
@@ -13,7 +14,7 @@ router.use(enforceTenantIsolation);
  * GET /api/analytics/overview
  * Get analytics overview for a tenant
  */
-router.get('/overview', async (req: Request, res: Response) => {
+router.get('/overview', requirePermission('VIEW_ANALYTICS'), async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).user?.tenantId;
     const days = parseInt(req.query.days as string) || 30;
@@ -167,7 +168,7 @@ router.get('/overview', async (req: Request, res: Response) => {
  * GET /api/analytics/messages
  * Get message analytics
  */
-router.get('/messages', async (req: Request, res: Response) => {
+router.get('/messages', requirePermission('VIEW_ANALYTICS'), async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).user?.tenantId;
     const days = parseInt(req.query.days as string) || 7;

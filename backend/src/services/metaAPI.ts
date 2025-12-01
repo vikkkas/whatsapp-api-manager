@@ -251,6 +251,176 @@ export class MetaWhatsAppAPI {
   }
 
   /**
+   * Send interactive message (buttons, lists, etc.)
+   */
+  async sendInteractiveMessage(
+    to: string,
+    interactive: {
+      type: 'button' | 'list';
+      header?: {
+        type: 'text' | 'image' | 'video' | 'document';
+        text?: string;
+        image?: { link: string };
+        video?: { link: string };
+        document?: { link: string };
+      };
+      body: {
+        text: string;
+      };
+      footer?: {
+        text: string;
+      };
+      action: {
+        buttons?: Array<{
+          type: 'reply';
+          reply: {
+            id: string;
+            title: string;
+          };
+        }>;
+        button?: string; // For list messages
+        sections?: Array<{
+          title?: string;
+          rows: Array<{
+            id: string;
+            title: string;
+            description?: string;
+          }>;
+        }>;
+      };
+    }
+  ) {
+    try {
+      const payload = {
+        messaging_product: 'whatsapp',
+        recipient_type: 'individual',
+        to,
+        type: 'interactive',
+        interactive,
+      };
+
+      const response = await this.axiosInstance.post(`/${this.phoneNumberId}/messages`, payload);
+
+      log.info('Interactive message sent', { to, type: interactive.type, messageId: response.data.messages[0].id });
+
+      return {
+        success: true,
+        messageId: response.data.messages[0].id,
+        wabaMessageId: response.data.messages[0].id,
+      };
+    } catch (error) {
+      log.error('Failed to send interactive message', { to, error });
+      throw error;
+    }
+  }
+
+  /**
+   * Send quick reply buttons (up to 3 buttons)
+   */
+  async sendQuickReplyButtons(
+    to: string,
+    bodyText: string,
+    buttons: Array<{ id: string; title: string }>,
+    options?: {
+      headerText?: string;
+      footerText?: string;
+    }
+  ) {
+    if (buttons.length > 3) {
+      throw new Error('Maximum 3 buttons allowed for quick replies');
+    }
+
+    const interactive: any = {
+      type: 'button',
+      body: {
+        text: bodyText,
+      },
+      action: {
+        buttons: buttons.map(btn => ({
+          type: 'reply',
+          reply: {
+            id: btn.id,
+            title: btn.title.substring(0, 20), // Max 20 chars
+          },
+        })),
+      },
+    };
+
+    if (options?.headerText) {
+      interactive.header = {
+        type: 'text',
+        text: options.headerText,
+      };
+    }
+
+    if (options?.footerText) {
+      interactive.footer = {
+        text: options.footerText,
+      };
+    }
+
+    return this.sendInteractiveMessage(to, interactive);
+  }
+
+  /**
+   * Send list message (up to 10 sections with multiple rows each)
+   */
+  async sendListMessage(
+    to: string,
+    bodyText: string,
+    buttonText: string,
+    sections: Array<{
+      title?: string;
+      rows: Array<{
+        id: string;
+        title: string;
+        description?: string;
+      }>;
+    }>,
+    options?: {
+      headerText?: string;
+      footerText?: string;
+    }
+  ) {
+    if (sections.length > 10) {
+      throw new Error('Maximum 10 sections allowed for list messages');
+    }
+
+    const interactive: any = {
+      type: 'list',
+      body: {
+        text: bodyText,
+      },
+      action: {
+        button: buttonText.substring(0, 20), // Max 20 chars
+        sections: sections.map(section => ({
+          title: section.title?.substring(0, 24), // Max 24 chars
+          rows: section.rows.map(row => ({
+            id: row.id.substring(0, 200), // Max 200 chars
+            title: row.title.substring(0, 24), // Max 24 chars
+            description: row.description?.substring(0, 72), // Max 72 chars
+          })),
+        })),
+      },
+    };
+
+    if (options?.headerText) {
+      interactive.header = {
+        type: 'text',
+        text: options.headerText,
+      };
+    }
+
+    if (options?.footerText) {
+      interactive.footer = {
+        text: options.footerText,
+      };
+    }
+
+    return this.sendInteractiveMessage(to, interactive);
+  }
+
+  /**
    * Get message templates
    */
   async getTemplates(businessAccountId: string) {

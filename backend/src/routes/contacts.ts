@@ -1,5 +1,6 @@
 import { Router, Request, Response } from 'express';
 import { authenticate } from '../middleware/auth.js';
+import { requirePermission } from '../middleware/permissions.js';
 import prisma from '../config/prisma.js';
 import { log } from '../utils/logger.js';
 import { Parser } from 'json2csv';
@@ -10,7 +11,7 @@ const router = Router();
 router.use(authenticate);
 
 // List contacts with pagination and search
-router.get('/', async (req: Request, res: Response) => {
+router.get('/', requirePermission('VIEW_CONTACTS'), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
     const page = parseInt(req.query.page as string) || 1;
@@ -92,7 +93,7 @@ router.get('/', async (req: Request, res: Response) => {
 });
 
 // Get single contact
-router.get('/:id', async (req: Request, res: Response) => {
+router.get('/:id', requirePermission('VIEW_CONTACTS'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const tenantId = req.user!.tenantId;
@@ -128,7 +129,7 @@ router.get('/:id', async (req: Request, res: Response) => {
 });
 
 // Create contact
-router.post('/', async (req: Request, res: Response) => {
+router.post('/', requirePermission('CREATE_CONTACT'), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
     const { phoneNumber, name, email, company, notes, tags } = req.body;
@@ -181,7 +182,7 @@ router.post('/', async (req: Request, res: Response) => {
 });
 
 // Update contact
-router.patch('/:id', async (req: Request, res: Response) => {
+router.patch('/:id', requirePermission('EDIT_CONTACT'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const tenantId = req.user!.tenantId;
@@ -227,7 +228,7 @@ router.patch('/:id', async (req: Request, res: Response) => {
 });
 
 // Delete contact
-router.delete('/:id', async (req: Request, res: Response) => {
+router.delete('/:id', requirePermission('DELETE_CONTACT'), async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const tenantId = req.user!.tenantId;
@@ -264,7 +265,7 @@ router.delete('/:id', async (req: Request, res: Response) => {
 });
 
 // Export contacts to CSV
-router.get('/export/csv', async (req: Request, res: Response) => {
+router.get('/export/csv', requirePermission('EXPORT_DATA'), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
 
@@ -290,7 +291,7 @@ router.get('/export/csv', async (req: Request, res: Response) => {
 });
 
 // Import contacts from CSV
-router.post('/import/csv', async (req: Request, res: Response) => {
+router.post('/import/csv', requirePermission('IMPORT_DATA'), async (req: Request, res: Response) => {
   try {
     const tenantId = req.user!.tenantId;
     const { contacts } = req.body;
@@ -350,7 +351,8 @@ router.post('/import/csv', async (req: Request, res: Response) => {
 
     res.json({
       success: true,
-      created: created.length,
+      createdCount: created.length,
+      createdContacts: created,
       errors: errors.length,
       errorDetails: errors,
     });

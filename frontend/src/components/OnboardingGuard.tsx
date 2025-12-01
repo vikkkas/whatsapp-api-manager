@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
-import { settingsAPI } from '../lib/api';
+import { settingsAPI, authAPI } from '../lib/api';
 import { Loader2 } from 'lucide-react';
 
 interface OnboardingGuardProps {
@@ -29,6 +29,14 @@ export const OnboardingGuard: React.FC<OnboardingGuardProps> = ({ children }) =>
 
       // Skip check for public paths
       if (PUBLIC_PATHS.includes(location.pathname)) {
+        setIsOnboarded(true);
+        setIsLoading(false);
+        return;
+      }
+
+      // Bypass for Agents (they don't configure WABA)
+      const user = authAPI.getCurrentUser();
+      if (user?.role === 'AGENT') {
         setIsOnboarded(true);
         setIsLoading(false);
         return;

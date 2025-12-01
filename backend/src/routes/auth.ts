@@ -244,6 +244,17 @@ router.post('/login', async (req: Request, res: Response) => {
     const token = generateToken(payload);
     const refreshToken = generateRefreshToken(payload);
 
+    // Create session
+    await prisma.session.create({
+      data: {
+        token,
+        adminUserId: user.id,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    });
+
     res.json({
       success: true,
       data: {
@@ -394,6 +405,116 @@ router.get('/me', async (req: Request, res: Response) => {
     res.status(401).json({
       success: false,
       error: 'Unauthorized',
+    });
+  }
+});
+
+/**
+ * POST /api/auth/agent-login
+ * Agent login with email and password
+ */
+router.post('/agent-login', async (req: Request, res: Response) => {
+  try {
+    const data = loginSchema.parse(req.body);
+
+    // Find agent
+    const agent = await prisma.agent.findFirst({
+      where: { email: data.email },
+      include: { tenant: true },
+    });
+
+    if (!agent || !agent.password) {
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials',
+      });
+    }
+
+    // Verify password using helper
+    const isValidPassword = await comparePassword(data.password, agent.password);
+
+    if (!isValidPassword) {
+      log.warn('Agent login failed: Invalid password', { email: data.email });
+      return res.status(401).json({
+        success: false,
+        error: 'Invalid credentials',
+      });
+    }
+
+    // Check if password is temporary (FirstName1234 pattern)
+    const isTempPassword = /^[A-Z][a-z]+\d{4}$/.test(data.password);
+
+    log.info('Agent logged in', {
+      agentId: agent.id,
+      tenantId: agent.tenantId,
+      email: agent.email,
+    });
+
+    // Generate JWT token with permissions
+    const payload = {
+      userId: agent.id,
+      tenantId: agent.tenantId,
+      email: agent.email,
+      role: 'AGENT',
+      permissions: agent.permissions,
+    };
+
+    const token = jwt.sign(payload, env.JWT_SECRET, {
+      expiresIn: env.JWT_EXPIRES_IN,
+    } as jwt.SignOptions);
+
+    const refreshToken = jwt.sign(payload, env.JWT_REFRESH_SECRET, {
+      expiresIn: env.JWT_REFRESH_EXPIRES_IN,
+    } as jwt.SignOptions);
+
+    // Create session
+    await prisma.session.create({
+      data: {
+        token,
+        agentId: agent.id,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000), // 7 days
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      },
+    });
+
+    res.json({
+      success: true,
+      data: {
+        user: {
+          id: agent.id,
+          email: agent.email,
+          name: agent.name,
+          role: 'AGENT',
+          permissions: agent.permissions,
+        },
+        tenant: {
+          id: agent.tenant.id,
+          name: agent.tenant.name,
+          slug: agent.tenant.slug,
+          plan: agent.tenant.plan,
+          status: agent.tenant.status,
+          themeColor: agent.tenant.themeColor,
+          logoUrl: agent.tenant.logoUrl,
+        },
+        token,
+        refreshToken,
+        mustChangePassword: isTempPassword,
+      },
+    });
+  } catch (error: any) {
+    if (error instanceof z.ZodError) {
+      return res.status(400).json({
+        success: false,
+        error: 'Validation error',
+        details: error.errors,
+      });
+    }
+
+    log.error('Agent login error', { error: error.message });
+    res.status(500).json({
+      success: false,
+      error: 'Login failed',
     });
   }
 });

@@ -23,6 +23,9 @@ router.get('/', async (req: Request, res: Response) => {
       });
     }
 
+    const userRole = (req as any).user?.role;
+    const isAgent = userRole === 'AGENT';
+
     // Get WABA credentials
     const wabaCredential = await prisma.wABACredential.findFirst({
       where: { tenantId },
@@ -62,6 +65,29 @@ router.get('/', async (req: Request, res: Response) => {
       : `http://localhost:3000/api/webhook`);
 
     const webhookVerifyToken = tenant?.webhookVerifyToken || process.env.WEBHOOK_VERIFY_TOKEN || 'your-verify-token';
+
+    // Filter sensitive data for agents
+    if (isAgent) {
+      return res.json({
+        success: true,
+        settings: {
+          waba: wabaCredential ? {
+            phoneNumberId: wabaCredential.phoneNumberId,
+            phoneNumber: wabaCredential.phoneNumber,
+            displayName: wabaCredential.displayName,
+            // Explicitly exclude sensitive fields
+            accessToken: null,
+            businessAccountId: null,
+          } : null,
+          webhook: null, // Agents don't need webhook secrets
+          tenant: {
+            id: tenant?.id,
+            name: tenant?.name,
+            slug: tenant?.slug,
+          }
+        }
+      });
+    }
 
     res.json({
       success: true,
@@ -112,11 +138,19 @@ router.get('/', async (req: Request, res: Response) => {
 router.patch('/', async (req: Request, res: Response) => {
   try {
     const tenantId = (req as any).user?.tenantId;
+    const userRole = (req as any).user?.role;
     
     if (!tenantId) {
       return res.status(401).json({ 
         success: false, 
         message: 'Unauthorized - No tenant ID found' 
+      });
+    }
+
+    if (userRole !== 'TENANT_ADMIN' && userRole !== 'SYSTEM_ADMIN') {
+      return res.status(403).json({
+        success: false,
+        message: 'Forbidden - Only admins can update settings'
       });
     }
 
@@ -251,6 +285,7 @@ router.patch('/', async (req: Request, res: Response) => {
             slug: true,
             webhookUrl: true,
             webhookVerifyToken: true,
+            webhookVerifiedAt: true,
           }
         })
       : await prisma.tenant.findUnique({
@@ -261,6 +296,7 @@ router.patch('/', async (req: Request, res: Response) => {
             slug: true,
             webhookUrl: true,
             webhookVerifyToken: true,
+            webhookVerifiedAt: true,
           }
         });
 

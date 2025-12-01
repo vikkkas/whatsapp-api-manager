@@ -21,6 +21,7 @@ import {
   RefreshCw
 } from 'lucide-react';
 import { settingsAPI } from '@/lib/api';
+import { usePermissions } from '@/hooks/usePermissions';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -63,6 +64,15 @@ const SettingsPage = () => {
   const [verifyToken, setVerifyToken] = useState('');
   const [webhookVerifiedAt, setWebhookVerifiedAt] = useState<string | null>(null);
   const [isVerifyingWebhook, setIsVerifyingWebhook] = useState(false);
+
+  const { hasPermission, isTenantAdmin } = usePermissions();
+
+  useEffect(() => {
+    if (!isTenantAdmin() && !hasPermission('VIEW_SETTINGS')) {
+      navigate('/inbox');
+      toast.error('You do not have permission to view settings');
+    }
+  }, [isTenantAdmin, hasPermission, navigate]);
 
   const fetchSettings = useCallback(async () => {
     try {
