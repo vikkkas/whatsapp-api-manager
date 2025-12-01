@@ -82,22 +82,29 @@ export class FlowExecutor {
       return;
     }
 
+    // Remove '+' prefix for Meta API
+    const metaRecipient = contactPhone.startsWith('+') 
+      ? contactPhone.slice(1) 
+      : contactPhone;
+
     try {
       const metaAPI = await getMetaAPIForTenant(tenantId);
 
       if (buttons && buttons.length > 0) {
         // Send interactive message
         await metaAPI.sendQuickReplyButtons(
-          contactPhone,
+          metaRecipient,
           content || 'Please select an option:',
           buttons.map((b: any, i: number) => ({ id: b.id || `btn-${i}`, title: b.label })),
         );
       } else {
         // Send text
-        if (content) await metaAPI.sendTextMessage(contactPhone, content);
+        if (content) await metaAPI.sendTextMessage(metaRecipient, content);
       }
+      
+      log.info('Flow message sent successfully', { to: metaRecipient, tenantId });
     } catch (error) {
-      log.error('Failed to send flow message', { error });
+      log.error('Failed to send flow message', { error, to: metaRecipient });
     }
   }
 }
