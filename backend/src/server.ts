@@ -28,6 +28,7 @@ import internalRoutes from './routes/internal.js';
 import campaignRoutes from './routes/campaigns.js';
 import cannedResponseRoutes from './routes/cannedResponses.js';
 import agentRoutes from './routes/agents.js';
+import flowRoutes from './routes/flows.js';
 
 const app: Express = express();
 const PORT = env.PORT;
@@ -114,6 +115,7 @@ app.use('/api/campaigns', campaignRoutes);
 app.use('/api/canned-responses', cannedResponseRoutes);
 app.use('/api/agents', agentRoutes);
 app.use('/api/internal', internalRoutes);
+app.use('/api/flows', flowRoutes);
 
 // ============================================
 // ROOT ENDPOINT

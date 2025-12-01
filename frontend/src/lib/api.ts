@@ -636,9 +636,46 @@ export const settingsAPI = {
   },
 };
 
-// Health check
-export const healthAPI = {
-  check: async () => {
-    return apiRequest('/api/health');
+// Flow API
+export const flowAPI = {
+  list: async () => {
+    return apiRequest<{ flows: any[] }>('/api/flows');
+  },
+
+  get: async (id: string) => {
+    return apiRequest(`/api/flows/${id}`);
+  },
+
+  create: async (data: {
+    name: string;
+    description?: string;
+    triggerType: string;
+    trigger?: string;
+  }) => {
+    return apiRequest('/api/flows', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+
+  update: async (id: string, data: {
+    name?: string;
+    description?: string;
+    triggerType?: string;
+    trigger?: string;
+    nodes?: any[];
+    edges?: any[];
+    isActive?: boolean;
+  }) => {
+    return apiRequest(`/api/flows/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data),
+    });
+  },
+
+  delete: async (id: string) => {
+    return apiRequest(`/api/flows/${id}`, {
+      method: 'DELETE',
+    });
   },
 };

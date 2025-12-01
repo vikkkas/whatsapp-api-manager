@@ -29,6 +29,8 @@ const CampaignManagement = lazy(() => import("./pages/CampaignManagement"));
 const AgentManagement = lazy(() => import("./pages/AgentManagement"));
 const CannedResponses = lazy(() => import("./pages/CannedResponses"));
 const AgentLogin = lazy(() => import("./pages/AgentLogin"));
+const FlowList = lazy(() => import("./pages/FlowList"));
+const FlowBuilder = lazy(() => import("./pages/FlowBuilder"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 
 const queryClient = new QueryClient({
@@ -183,6 +185,34 @@ const App = () => (
                               <CannedResponses />
                             </PermissionGuard>
                           </DashboardLayout>
+                        </OnboardingGuard>
+                      </ProtectedRoute>
+                    }
+                  />
+
+                  {/* Flows - protected route */}
+                  <Route
+                    path="/flows"
+                    element={
+                      <ProtectedRoute>
+                        <OnboardingGuard>
+                          <DashboardLayout>
+                            <PermissionGuard permission="VIEW_FLOWS">
+                              <FlowList />
+                            </PermissionGuard>
+                          </DashboardLayout>
+                        </OnboardingGuard>
+                      </ProtectedRoute>
+                    }
+                  />
+                  <Route
+                    path="/flows/:id"
+                    element={
+                      <ProtectedRoute>
+                        <OnboardingGuard>
+                          <PermissionGuard permission="EDIT_FLOWS">
+                            <FlowBuilder />
+                          </PermissionGuard>
                         </OnboardingGuard>
                       </ProtectedRoute>
                     }

@@ -1,4 +1,4 @@
-import { MessageSquare, FileText, Settings, LogOut, User, BarChart3, Zap, Users, Target, UserCog } from "lucide-react";
+import { MessageSquare, FileText, Settings, LogOut, User, BarChart3, Zap, Users, Target, UserCog, GitBranch } from "lucide-react";
 import { NavLink, useNavigate } from "react-router-dom";
 import {
   Sidebar,
@@ -24,6 +24,7 @@ const items = [
   { title: "Templates", url: "/templates", icon: FileText, permission: 'VIEW_TEMPLATES' },
   { title: "Quick Replies", url: "/canned-responses", icon: Zap, permission: 'VIEW_CANNED_RESPONSES' },
   { title: "Analytics", url: "/analytics", icon: BarChart3, permission: 'VIEW_ANALYTICS' },
+  { title: "Flows", url: "/flows", icon: GitBranch, permission: 'VIEW_FLOWS' },
   { title: "Agents", url: "/agents", icon: UserCog, adminOnly: true },
   { title: "Settings", url: "/settings", icon: Settings, permission: 'VIEW_SETTINGS' },
 ];

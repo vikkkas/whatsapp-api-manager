@@ -20,6 +20,7 @@ jobs:
               [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
               cd /root/whatsapp-api-manager/backend
               git pull origin main
+              npx prisma generate
               npm install
               npm run build
               pm2 restart whatsapp-backend

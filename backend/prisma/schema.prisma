@@ -53,6 +53,7 @@ model Tenant {
   contacts      Contact[]
   campaigns     Campaign[]
   cannedResponses CannedResponse[]
+  flows         Flow[]
   
   @@index([slug])
   @@index([status])
@@ -171,6 +172,12 @@ enum AgentPermission {
   // Agent Management (for senior agents)
   VIEW_AGENTS
   MANAGE_AGENTS
+
+  // Flow Builder
+  VIEW_FLOWS
+  CREATE_FLOWS
+  EDIT_FLOWS
+  DELETE_FLOWS
 }
 
 enum AgentStatus {
@@ -604,4 +611,43 @@ model Session {
   @@index([adminUserId])
   @@index([agentId])
   @@index([token])
+}
+
+// ============================================
+// FLOW BUILDER
+// ============================================
+
+model Flow {
+  id          String   @id @default(cuid())
+  tenantId    String
+  tenant      Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  name        String
+  description String?
+  
+  // Trigger configuration
+  triggerType FlowTriggerType @default(KEYWORD)
+  trigger     String?         // Keyword or other trigger data
+  
+  // Flow structure (React Flow format)
+  nodes       Json     // Array of nodes
+  edges       Json     // Array of edges
+  
+  isActive    Boolean  @default(false)
+  
+  // Analytics
+  runsCount   Int      @default(0)
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([tenantId])
+  @@index([isActive])
+}
+
+enum FlowTriggerType {
+  KEYWORD
+  NEW_MESSAGE
+  CONVERSATION_OPENED
+  MANUAL
 }
