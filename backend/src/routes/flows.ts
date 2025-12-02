@@ -62,7 +62,10 @@ router.post('/', requirePermission('CREATE_FLOWS'), async (req: Request, res: Re
     const data = createFlowSchema.parse(req.body);
     const flow = await prisma.flow.create({
       data: {
-        ...data,
+        name: data.name,
+        description: data.description,
+        triggerType: data.triggerType,
+        trigger: data.trigger,
         tenantId: req.user!.tenantId,
         nodes: [],
         edges: [],

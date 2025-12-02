@@ -315,7 +315,7 @@ export async function updateTemplateForTenant(
   const result = await metaAPI.createTemplate(
     credential.businessAccountId,
     normalizedName,
-    updatedCategory,
+    updatedCategory as typeof META_CATEGORY[number],
     updatedLanguage,
     metaComponents
   );
