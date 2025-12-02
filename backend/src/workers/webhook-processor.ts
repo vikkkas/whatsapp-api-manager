@@ -246,7 +246,6 @@ async function processInboundMessage(
     });
   }
 
-
   // Determine message type and content
   let messageType: string = 'TEXT';
   let text: string | null = null;
@@ -284,6 +283,18 @@ async function processInboundMessage(
     mediaId = messageData.document.id;
     mediaMimeType = messageData.document.mime_type;
     mediaCaption = messageData.document.caption;
+  } else if (messageData.interactive) {
+    // Handle button clicks and interactive messages
+    messageType = 'INTERACTIVE';
+    if (messageData.interactive.type === 'button_reply') {
+      // User clicked a button
+      text = `Selected: ${messageData.interactive.button_reply.title}`;
+    } else if (messageData.interactive.type === 'list_reply') {
+      // User selected from a list
+      text = `Selected: ${messageData.interactive.list_reply.title}`;
+    } else {
+      text = 'Interactive response';
+    }
   } else if (messageData.location) {
     messageType = 'LOCATION';
     text = `Location: ${messageData.location.latitude},${messageData.location.longitude}`;
@@ -308,6 +319,7 @@ async function processInboundMessage(
       mediaId,
       mediaMimeType,
       mediaCaption,
+      interactiveData: messageType === 'INTERACTIVE' ? messageData.interactive : undefined,
       timestamp,
       deliveredAt: timestamp,
     },
@@ -322,38 +334,60 @@ async function processInboundMessage(
   log.info('Inbound message saved', { waMessageId, conversationId: conversation.id });
 
   // ==========================================
-  // TRIGGER AUTOMATION FLOWS
+  // TRIGGER AUTOMATION FLOWS (Queue-based)
   // ==========================================
   try {
-    const { flowExecutor } = await import('../services/flowExecutor.js');
+    const { triggerFlows, handleButtonClick } = await import('../queues/flowExecutionQueue.js');
     
-    // 1. Keyword Trigger (for text messages)
-    if (messageType === 'TEXT' && text) {
-      await flowExecutor.executeTrigger(tenantId, 'KEYWORD', {
+    // Check if this is a button response
+    const isButtonResponse = messageType === 'INTERACTIVE' && messageData.interactive?.type === 'button_reply';
+    
+    if (isButtonResponse) {
+      // Handle button click - queues flow resumption
+      const buttonId = messageData.interactive.button_reply.id;
+      await handleButtonClick(tenantId, normalizedFrom, buttonId, {
+        contactId: contact.id,
+        conversationId: conversation.id,
+      });
+      
+      log.info('Button click queued', { buttonId });
+    } else {
+      // Regular message triggers - queue flow executions
+      
+      // 1. Keyword Trigger (for text messages)
+      if (messageType === 'TEXT' && text) {
+        await triggerFlows(tenantId, 'KEYWORD', {
+          contactPhone: normalizedFrom,
+          messageBody: text,
+          messageType,
+          contactId: contact.id,
+          conversationId: conversation.id,
+        });
+      }
+
+      // 2. New Message Trigger (any message type)
+      await triggerFlows(tenantId, 'NEW_MESSAGE', {
         contactPhone: normalizedFrom,
         messageBody: text,
-        from: normalizedFrom,
+        messageType,
+        contactId: contact.id,
+        conversationId: conversation.id,
       });
-    }
 
-    // 2. New Message Trigger (any message type)
-    await flowExecutor.executeTrigger(tenantId, 'NEW_MESSAGE', {
-      contactPhone: normalizedFrom,
-      messageBody: text,
-      from: normalizedFrom,
-    });
-
-    // 3. Conversation Opened Trigger (first message only)
-    if (isNewConversation) {
-      await flowExecutor.executeTrigger(tenantId, 'CONVERSATION_OPENED', {
-        contactPhone: normalizedFrom,
-        messageBody: text,
-        from: normalizedFrom,
-      });
+      // 3. Conversation Opened Trigger (first message only)
+      if (isNewConversation) {
+        await triggerFlows(tenantId, 'CONVERSATION_OPENED', {
+          contactPhone: normalizedFrom,
+          messageBody: text,
+          messageType,
+          contactId: contact.id,
+          conversationId: conversation.id,
+        });
+      }
     }
   } catch (error) {
-    log.error('Error executing flow triggers', { error });
-    // Don't throw - webhook processing should continue even if flow execution fails
+    log.error('Error queuing flow executions', { error });
+    // Don't throw - webhook processing should continue
   }
 }
 

@@ -21,10 +21,16 @@ import Sidebar from '@/components/flow/Sidebar';
 import PropertiesPanel from '@/components/flow/PropertiesPanel';
 import MessageNode from '@/components/flow/nodes/MessageNode';
 import StartNode from '@/components/flow/nodes/StartNode';
+import { DelayNode } from '@/components/flow/nodes/DelayNode';
+import { ConditionNode } from '@/components/flow/nodes/ConditionNode';
+import { ActionNode } from '@/components/flow/nodes/ActionNode';
 
 const nodeTypes = {
   message: MessageNode,
   start: StartNode,
+  delay: DelayNode,
+  condition: ConditionNode,
+  action: ActionNode,
 };
 
 const FlowBuilderContent = () => {
@@ -118,6 +124,45 @@ const FlowBuilderContent = () => {
     setSelectedNode(null);
   }, []);
 
+  const onNodesDelete = useCallback((deleted: Node[]) => {
+    // Prevent deletion of start node
+    const hasStartNode = deleted.some(node => node.type === 'start');
+    if (hasStartNode) {
+      toast.error('Cannot delete the Start node');
+      return;
+    }
+    
+    // If deleted node was selected, clear selection
+    if (selectedNode && deleted.some(node => node.id === selectedNode.id)) {
+      setSelectedNode(null);
+    }
+  }, [selectedNode]);
+
+  // Handle keyboard delete
+  useEffect(() => {
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if ((event.key === 'Delete' || event.key === 'Backspace') && selectedNode) {
+        // Don't delete if typing in an input
+        if ((event.target as HTMLElement).tagName === 'INPUT' || 
+            (event.target as HTMLElement).tagName === 'TEXTAREA') {
+          return;
+        }
+        
+        // Prevent deletion of start node
+        if (selectedNode.type === 'start') {
+          toast.error('Cannot delete the Start node');
+          return;
+        }
+        
+        setNodes((nds) => nds.filter((n) => n.id !== selectedNode.id));
+        setSelectedNode(null);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedNode, setNodes]);
+
   const handleNodeChange = (nodeId: string, newData: any) => {
     setNodes((nds) =>
       nds.map((node) => {
@@ -182,6 +227,7 @@ const FlowBuilderContent = () => {
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}
             onConnect={onConnect}
+            onNodesDelete={onNodesDelete}
             onInit={setReactFlowInstance}
             onDrop={onDrop}
             onDragOver={onDragOver}

@@ -89,3 +89,4 @@ jspm_packages/
 dist
 
 package-lock.json
+*.txt

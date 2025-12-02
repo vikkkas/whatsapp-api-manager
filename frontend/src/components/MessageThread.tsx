@@ -159,6 +159,16 @@ export function MessageThread({ conversationId, onBack }: Props) {
     scrollToBottom('auto');
   }, [conversationId]);
 
+  // Debug log for messages
+  useEffect(() => {
+    console.log('Messages updated:', messages.map(m => ({
+      id: m.id,
+      type: m.type,
+      interactiveData: m.interactiveData,
+      interactive: (m as any).interactive
+    })));
+  }, [messages]);
+
   const scrollToBottom = (behavior: ScrollBehavior = 'smooth') => {
     messagesEndRef.current?.scrollIntoView({ behavior });
   };
@@ -337,6 +347,20 @@ export function MessageThread({ conversationId, onBack }: Props) {
       return;
     }
 
+    // Validate button label length
+    const invalidButton = buttons.find(b => b.label.length > 20);
+    if (invalidButton) {
+      toast.error(`Button label "${invalidButton.label}" is too long (max 20 chars)`);
+      return;
+    }
+
+    // Validate duplicate buttons
+    const labels = buttons.map(b => b.label.toLowerCase());
+    if (new Set(labels).size !== labels.length) {
+      toast.error('Button labels must be unique');
+      return;
+    }
+
     setSending(true);
     try {
       const sentMessage = await messageAPI.send({
@@ -503,10 +527,34 @@ export function MessageThread({ conversationId, onBack }: Props) {
   };
 
   const renderMessage = (message: any, index: number) => {
+    // Debug logging
+    if (message.type === 'INTERACTIVE') {
+      console.log('Rendering INTERACTIVE message:', {
+        id: message.id,
+        direction: message.direction,
+        text: message.text,
+        interactiveData: message.interactiveData
+      });
+    }
+
     const isOutbound = message.direction === 'OUTBOUND';
     const prevMessage = messages[index - 1];
     const showDateDivider = !prevMessage || !isSameDay(new Date(message.createdAt), new Date(prevMessage.createdAt));
     const showTail = index === messages.length - 1 || messages[index + 1]?.direction !== message.direction;
+
+    // Ensure interactiveData is an object
+    let interactiveData = message.interactiveData;
+    if (typeof interactiveData === 'string') {
+      try {
+        interactiveData = JSON.parse(interactiveData);
+      } catch (e) {
+        console.error('Failed to parse interactiveData', e);
+      }
+    }
+    // Merge with optimistic interactive data if available
+    if (!interactiveData && message.interactive) {
+      interactiveData = message.interactive;
+    }
 
     return (
       <div key={message.id}>
@@ -542,8 +590,65 @@ export function MessageThread({ conversationId, onBack }: Props) {
                   {message.text}
                 </p>
               )}
+              {message.type === 'INTERACTIVE' && (
+                <div className="space-y-2">
+                  {/* Handle Inbound Button Reply */}
+                  {interactiveData?.type === 'button_reply' ? (
+                    <div className="flex items-center gap-2">
+                      <div className="bg-blue-50 text-blue-600 p-1.5 rounded-full">
+                        <MousePointerClick className="h-4 w-4" />
+                      </div>
+                      <div>
+                        <p className="text-xs opacity-70 mb-0.5">Selected Option</p>
+                        <p className="font-bold">
+                          {interactiveData.button_reply?.title || message.text}
+                        </p>
+                      </div>
+                    </div>
+                  ) : (
+                    /* Handle Outbound Button Message OR Legacy/Fallback */
+                    <>
+                      <p className="whitespace-pre-wrap break-words leading-relaxed">
+                        {interactiveData?.body?.text || message.text || 'Please select an option:'}
+                      </p>
+                      
+                      {/* Display buttons if available (Outbound) */}
+                      {interactiveData?.action?.buttons?.length > 0 ? (
+                        <div className="mt-3 space-y-2">
+                          {interactiveData.action.buttons.map((btn: any, index: number) => (
+                            <button
+                              key={index}
+                              disabled
+                              className={`
+                                w-full px-4 py-2.5 text-sm font-medium rounded-lg border
+                                transition-colors cursor-not-allowed text-left flex justify-between items-center
+                                ${isOutbound 
+                                  ? 'bg-blue-500/10 border-blue-400/30 text-blue-100' 
+                                  : 'bg-white border-gray-300 text-gray-700'
+                                }
+                              `}
+                            >
+                              <span>{btn.reply?.title || btn.label}</span>
+                              <MousePointerClick className="h-3 w-3 opacity-50" />
+                            </button>
+                          ))}
+                        </div>
+                      ) : (
+                        /* Fallback for legacy messages or missing button data */
+                        isOutbound && !interactiveData && (
+                          <div className="mt-2 pt-2 border-t border-gray-200/20">
+                            <p className="text-xs opacity-75 italic">
+                              📱 Interactive message
+                            </p>
+                          </div>
+                        )
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
               {message.type === 'TEMPLATE' && renderTemplateMessage(message)}
-              {message.type !== 'TEXT' && message.type !== 'TEMPLATE' && renderMediaPreview(message)}
+              {message.type !== 'TEXT' && message.type !== 'TEMPLATE' && message.type !== 'INTERACTIVE' && renderMediaPreview(message)}
 
               {/* Timestamp and status */}
               <div className={`flex items-center justify-end gap-1 mt-1 ${
@@ -786,21 +891,27 @@ export function MessageThread({ conversationId, onBack }: Props) {
                       value={interactiveBody}
                       onChange={(e) => setInteractiveBody(e.target.value)}
                       placeholder="Enter your message text..."
+                      maxLength={1024}
                     />
                   </div>
                   <div className="space-y-2">
                     <Label>Buttons (Max 3)</Label>
                     {interactiveButtons.map((btn, idx) => (
-                      <Input
-                        key={idx}
-                        value={btn}
-                        onChange={(e) => {
-                          const newButtons = [...interactiveButtons];
-                          newButtons[idx] = e.target.value;
-                          setInteractiveButtons(newButtons);
-                        }}
-                        placeholder={`Button ${idx + 1} Label`}
-                      />
+                      <div key={idx} className="relative">
+                        <Input
+                          value={btn}
+                          onChange={(e) => {
+                            const newButtons = [...interactiveButtons];
+                            newButtons[idx] = e.target.value;
+                            setInteractiveButtons(newButtons);
+                          }}
+                          placeholder={`Button ${idx + 1} Label`}
+                          maxLength={20}
+                        />
+                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-xs text-gray-400 pointer-events-none">
+                          {btn.length}/20
+                        </span>
+                      </div>
                     ))}
                   </div>
                 </div>

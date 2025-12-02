@@ -1,34 +1,42 @@
-import { MessageSquare, GitBranch, Clock, Tag } from 'lucide-react';
+import { MessageSquare, Clock, GitBranch, Zap } from 'lucide-react';
 
-const Sidebar = () => {
+export function Sidebar() {
   const onDragStart = (event: React.DragEvent, nodeType: string) => {
     event.dataTransfer.setData('application/reactflow', nodeType);
     event.dataTransfer.effectAllowed = 'move';
   };
 
+  const nodeTypes = [
+    { type: 'message', label: 'Send Message', icon: MessageSquare, color: 'text-blue-500' },
+    { type: 'delay', label: 'Delay', icon: Clock, color: 'text-orange-500' },
+    { type: 'condition', label: 'Condition', icon: GitBranch, color: 'text-purple-500' },
+    { type: 'action', label: 'Action', icon: Zap, color: 'text-yellow-500' },
+  ];
+
   return (
-    <div className="w-16 border-r bg-white flex flex-col items-center py-4 gap-4 z-10 shadow-sm">
-      <div 
-        className="p-3 rounded-lg hover:bg-blue-50 cursor-grab active:cursor-grabbing transition-colors"
-        onDragStart={(event) => onDragStart(event, 'message')}
-        draggable
-        title="Send Message"
-      >
-        <MessageSquare className="h-6 w-6 text-blue-600" />
+    <div className="w-64 bg-white border-r border-gray-200 p-4">
+      <h3 className="text-sm font-semibold text-gray-700 mb-4">Add Nodes</h3>
+      <div className="space-y-2">
+        {nodeTypes.map(({ type, label, icon: Icon, color }) => (
+          <div
+            key={type}
+            className="flex items-center gap-3 p-3 border border-gray-300 rounded-lg cursor-move hover:bg-gray-50 hover:border-blue-400 transition-colors"
+            draggable
+            onDragStart={(e) => onDragStart(e, type)}
+          >
+            <Icon className={`w-5 h-5 ${color}`} />
+            <span className="text-sm font-medium text-gray-700">{label}</span>
+          </div>
+        ))}
       </div>
       
-      {/* Future nodes */}
-      <div className="p-3 rounded-lg hover:bg-gray-50 cursor-not-allowed opacity-40" title="Condition (Coming Soon)">
-        <GitBranch className="h-6 w-6 text-purple-600" />
-      </div>
-      <div className="p-3 rounded-lg hover:bg-gray-50 cursor-not-allowed opacity-40" title="Delay (Coming Soon)">
-        <Clock className="h-6 w-6 text-orange-600" />
-      </div>
-       <div className="p-3 rounded-lg hover:bg-gray-50 cursor-not-allowed opacity-40" title="Action (Coming Soon)">
-        <Tag className="h-6 w-6 text-green-600" />
+      <div className="mt-6 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+        <p className="text-xs text-blue-800">
+          <strong>Tip:</strong> Drag nodes onto the canvas to build your automation flow.
+        </p>
       </div>
     </div>
   );
-};
+}
 
 export default Sidebar;

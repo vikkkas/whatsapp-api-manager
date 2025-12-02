@@ -303,6 +303,15 @@ router.post('/', requirePermission('SEND_MESSAGES'), async (req: Request, res: R
         ? data.templateComponents
         : null;
 
+    // Debug logging for interactive messages
+    if (data.type === 'interactive') {
+      console.log('Creating interactive message:', {
+        type: data.type,
+        hasInteractiveData: !!data.interactive,
+        interactiveData: JSON.stringify(data.interactive)
+      });
+    }
+
     // Save message to database
     const message = await prisma.message.create({
       data: {
@@ -323,6 +332,7 @@ router.post('/', requirePermission('SEND_MESSAGES'), async (req: Request, res: R
             ? templateData?.displayName || templateData?.name || data.templateName || null
             : null,
         templateParams: templateParams,
+        interactiveData: data.type === 'interactive' ? data.interactive : undefined,
       },
     });
 

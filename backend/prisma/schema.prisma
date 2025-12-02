@@ -357,6 +357,9 @@ model Message {
   templateName  String?
   templateParams Json?   // Array of parameter values
   
+  // Interactive messages (buttons, lists)
+  interactiveData Json?  // Stores button/list data for interactive messages
+  
   // Timestamps
   timestamp     DateTime @default(now())
   deliveredAt   DateTime?

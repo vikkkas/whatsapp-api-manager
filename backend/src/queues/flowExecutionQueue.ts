@@ -98,11 +98,12 @@ export async function triggerFlows(
       if (triggerType !== 'KEYWORD') return true;
       if (!flow.trigger || !context.messageBody) return false;
       
-      // Case-insensitive keyword matching
-      const keyword = flow.trigger.toLowerCase().trim();
+      // Split keywords by comma and trim each - FIXED for multiple keywords
+      const keywords = flow.trigger.split(',').map(k => k.toLowerCase().trim());
       const message = context.messageBody.toLowerCase().trim();
       
-      return message.includes(keyword);
+      // Check if message contains ANY of the keywords
+      return keywords.some(keyword => message.includes(keyword));
     });
 
     // Queue each matching flow
@@ -142,32 +143,44 @@ export async function handleButtonClick(
   }
 ): Promise<void> {
   try {
-    // Parse button payload: format is "flow-{flowId}-node-{nodeId}-btn-{buttonId}"
-    const match = buttonPayload.match(/^flow-(.+)-node-(.+)-btn-(.+)$/);
+    log.info('Button click received', { buttonPayload, contactPhone });
     
-    if (!match) {
-      log.warn('Invalid button payload format', { buttonPayload });
-      return;
-    }
+    // Try to parse flow button format: "flow-{flowId}-node-{nodeId}-btn-{buttonId}"
+    const flowMatch = buttonPayload.match(/^flow-(.+)-node-(.+)-btn-(.+)$/);
+    
+    if (flowMatch) {
+      // This is a flow button - resume the flow
+      const [, flowId, currentNodeId, buttonId] = flowMatch;
+      
+      log.info('Flow button detected', { flowId, currentNodeId, buttonId });
 
-    const [, flowId, currentNodeId, buttonId] = match;
+      await queueFlowExecution({
+        flowId,
+        tenantId,
+        context: {
+          contactPhone,
+          triggeredBy: 'BUTTON_CLICK',
+          buttonPayload: buttonId,
+          ...context,
+        },
+        currentNodeId,
+        executionState: {
+          lastButtonClick: buttonId,
+        },
+      });
 
-    await queueFlowExecution({
-      flowId,
-      tenantId,
-      context: {
+      log.info('Flow button click queued', { flowId, buttonId, contactPhone });
+    } else {
+      // This is a non-flow button (sent manually from inbox or other source)
+      log.info('Non-flow button clicked', { 
+        buttonPayload, 
         contactPhone,
-        triggeredBy: 'BUTTON_CLICK',
-        buttonPayload: buttonId,
-        ...context,
-      },
-      currentNodeId,
-      executionState: {
-        lastButtonClick: buttonId,
-      },
-    });
-
-    log.info('Button click queued', { flowId, buttonId, contactPhone });
+        note: 'Button does not match flow format, no flow will be resumed'
+      });
+      
+      // Could potentially trigger a new flow based on button text/ID
+      // For now, just log it
+    }
   } catch (error) {
     log.error('Error handling button click', { error, buttonPayload });
   }

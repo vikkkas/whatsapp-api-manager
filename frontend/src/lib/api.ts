@@ -33,13 +33,26 @@ export interface Message {
   status: 'PENDING' | 'SENT' | 'DELIVERED' | 'READ' | 'FAILED';
   from: string;
   to: string;
-  type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT' | 'TEMPLATE';
+  type: 'TEXT' | 'IMAGE' | 'VIDEO' | 'AUDIO' | 'DOCUMENT' | 'TEMPLATE' | 'INTERACTIVE';
   text?: string;
   mediaUrl?: string;
   caption?: string;
   filename?: string;
   templateName?: string;
   templateParams?: unknown;
+  interactiveData?: {
+    type: 'button' | 'list' | 'button_reply' | 'list_reply';
+    header?: { type: string; text?: string; image?: any; video?: any; document?: any };
+    body?: { text: string };
+    footer?: { text: string };
+    action?: {
+      buttons?: Array<{ type: 'reply'; reply: { id: string; title: string } }>;
+      button?: string;
+      sections?: Array<{ title?: string; rows: Array<{ id: string; title: string; description?: string }> }>;
+    };
+    button_reply?: { id: string; title: string };
+    list_reply?: { id: string; title: string; description?: string };
+  };
   createdAt: string;
   conversation?: {
     id: string;

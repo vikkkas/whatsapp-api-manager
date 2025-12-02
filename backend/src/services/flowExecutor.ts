@@ -2,6 +2,8 @@ import prisma from '../config/prisma.js';
 import { log } from '../utils/logger.js';
 import { getMetaAPIForTenant } from './metaAPI.js';
 
+import { broadcastNewMessage } from './websocket.js';
+
 export class FlowExecutor {
   async executeTrigger(tenantId: string, triggerType: 'KEYWORD' | 'NEW_MESSAGE' | 'CONVERSATION_OPENED', data: any) {
     try {
@@ -93,20 +95,77 @@ export class FlowExecutor {
 
     try {
       const metaAPI = await getMetaAPIForTenant(tenantId);
+      let result;
+      let interactiveData = undefined;
 
       if (buttons && buttons.length > 0) {
         // Send interactive message
-        await metaAPI.sendQuickReplyButtons(
+        result = await metaAPI.sendQuickReplyButtons(
           metaRecipient,
           content || 'Please select an option:',
           buttons.map((b: any, i: number) => ({ id: b.id || `btn-${i}`, title: b.label })),
         );
+
+        // Construct interactiveData for DB
+        interactiveData = {
+          type: 'button',
+          body: { text: content || 'Please select an option:' },
+          action: {
+            buttons: buttons.map((b: any, i: number) => ({
+              type: 'reply',
+              reply: { id: b.id || `btn-${i}`, title: b.label }
+            }))
+          }
+        };
       } else {
         // Send text
-        if (content) await metaAPI.sendTextMessage(metaRecipient, content);
+        if (content) {
+          result = await metaAPI.sendTextMessage(metaRecipient, content);
+        }
       }
       
       log.info('Flow message sent successfully', { to: metaRecipient, tenantId });
+
+      // Save to Database and Broadcast
+      if (result) {
+        let conversationId = context.conversationId;
+
+        // If conversationId is missing, try to find it
+        if (!conversationId) {
+          const conversation = await prisma.conversation.findFirst({
+            where: {
+              tenantId,
+              contactPhone: metaRecipient // Assuming DB stores normalized phone
+            }
+          });
+          conversationId = conversation?.id;
+        }
+
+        if (conversationId) {
+          const savedMessage = await prisma.message.create({
+            data: {
+              tenantId,
+              conversationId,
+              direction: 'OUTBOUND',
+              status: 'SENT',
+              type: interactiveData ? 'INTERACTIVE' : 'TEXT',
+              text: content || (interactiveData ? 'Interactive Message' : ''),
+              interactiveData: interactiveData || undefined,
+              waMessageId: result.messageId,
+              from: 'system',
+              to: metaRecipient,
+              createdAt: new Date(),
+            }
+          });
+
+          // Broadcast to UI
+          broadcastNewMessage(conversationId, savedMessage);
+          log.info('Flow message saved and broadcasted', { messageId: savedMessage.id });
+        } else {
+          log.warn('Could not save flow message: Conversation not found', { metaRecipient, tenantId });
+        }
+      }
+
     } catch (error) {
       log.error('Failed to send flow message', { error, to: metaRecipient });
     }

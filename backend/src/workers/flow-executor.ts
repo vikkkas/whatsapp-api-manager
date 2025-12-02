@@ -166,7 +166,7 @@ async function executeNode(
       break;
 
     case 'message':
-      await executeMessageNode(node, context, metaAPI, executionContext.flowId);
+      await executeMessageNode(node, executionContext);
       break;
 
     case 'condition':
@@ -218,10 +218,15 @@ async function executeNode(
  */
 async function executeMessageNode(
   node: FlowNode,
-  context: FlowExecutionJob['context'],
-  metaAPI: any,
-  flowId: string
+  executionContext: {
+    flowId: string;
+    tenantId: string;
+    context: FlowExecutionJob['context'];
+    executionState: Record<string, any>;
+    metaAPI: any;
+  }
 ): Promise<void> {
+  const { flowId, tenantId, context, metaAPI } = executionContext;
   const { content, buttons } = node.data;
   const contactPhone = context.contactPhone;
 
@@ -236,26 +241,52 @@ async function executeMessageNode(
     : contactPhone;
 
   try {
+    let messageResponse: any;
+    let messageType = 'TEXT';
+    let messageText = content || '';
+
     if (buttons && buttons.length > 0) {
       // Send interactive message with buttons
+      const actualMessageText = content || 'Please select an option:';
+      
       const formattedButtons = buttons.map((btn, index) => ({
         type: 'reply',
         reply: {
           // Include flow and node info in button ID for routing
-          id: `flow-${flowId}-node-${node.id}-btn-${btn.id}`,
+          // Use index as fallback if btn.id is missing or duplicate
+          id: `flow-${flowId}-node-${node.id}-btn-${btn.id || index}`,
           title: btn.label.substring(0, 20), // Meta limit: 20 chars
         },
       }));
 
-      await metaAPI.sendInteractiveMessage(metaRecipient, {
+      const payload = {
         type: 'button',
         body: {
-          text: content || 'Please select an option:',
+          text: actualMessageText,
         },
         action: {
           buttons: formattedButtons.slice(0, 3), // Meta limit: 3 buttons
         },
+      };
+
+      log.info('Sending interactive message payload', { 
+        to: metaRecipient, 
+        payload: JSON.stringify(payload) 
       });
+
+      try {
+        messageResponse = await metaAPI.sendInteractiveMessage(metaRecipient, payload);
+      } catch (err: any) {
+        log.error('Meta API Error Details', {
+          status: err.response?.status,
+          data: JSON.stringify(err.response?.data || {}),
+          payload: JSON.stringify(payload)
+        });
+        throw err;
+      }
+
+      messageType = 'INTERACTIVE';
+      messageText = actualMessageText; // Save the actual text that was sent
 
       log.info('Interactive message sent', {
         to: metaRecipient,
@@ -265,12 +296,61 @@ async function executeMessageNode(
     } else {
       // Send text message
       if (content) {
-        await metaAPI.sendTextMessage(metaRecipient, content);
+        messageResponse = await metaAPI.sendTextMessage(metaRecipient, content);
         log.info('Text message sent', {
           to: metaRecipient,
           nodeId: node.id,
         });
       }
+    }
+
+    // Save message to database so it appears in inbox
+    if (messageResponse && context.conversationId) {
+      const waMessageId = messageResponse.messageId || messageResponse.messages?.[0]?.id || `flow-${Date.now()}`;
+      
+      const savedMessage = await prisma.message.create({
+        data: {
+          tenantId,
+          conversationId: context.conversationId,
+          waMessageId,
+          direction: 'OUTBOUND',
+          status: 'SENT',
+          from: metaAPI.phoneNumberId || '',
+          to: contactPhone,
+          type: messageType as any,
+          text: messageText,
+          interactiveData: buttons && buttons.length > 0 ? {
+            type: 'button',
+            body: { text: messageText },
+            action: {
+              buttons: buttons.map((btn: any, index: number) => ({
+                type: 'reply',
+                reply: {
+                  id: `flow-${flowId}-node-${node.id}-btn-${btn.id || index}`,
+                  title: btn.label
+                }
+              }))
+            }
+          } : undefined,
+          timestamp: new Date(),
+        },
+      });
+
+      // Publish WebSocket event so message appears in real-time
+      const { publishWebSocketEvent } = await import('../services/pubsub.js');
+      await publishWebSocketEvent({
+        type: 'message:new',
+        data: { 
+          conversationId: context.conversationId, 
+          message: savedMessage 
+        },
+      });
+
+      log.info('Flow message saved to database', {
+        messageId: savedMessage.id,
+        waMessageId,
+        conversationId: context.conversationId,
+      });
     }
   } catch (error) {
     log.error('Failed to send message in flow', {

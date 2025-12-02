@@ -2,6 +2,7 @@ import dotenv from 'dotenv';
 import { log } from '../utils/logger.js';
 import webhookWorker from './webhook-processor.js';
 import messageSendWorker from './message-sender.js';
+import flowExecutorWorker from './flow-executor.js';
 
 // Load environment variables
 dotenv.config();
@@ -17,6 +18,7 @@ const gracefulShutdown = async (signal: string) => {
     await Promise.all([
       webhookWorker.close(),
       messageSendWorker.close(),
+      flowExecutorWorker.close(),
     ]);
 
     log.info('Workers shut down successfully');
@@ -43,3 +45,4 @@ process.on('uncaughtException', (error: Error) => {
 log.info('✅ Workers started successfully');
 log.info('📬 Webhook processor: Ready');
 log.info('📤 Message sender: Ready');
+log.info('🤖 Flow executor: Ready');
